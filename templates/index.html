@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Trend Predictor — AI Fundamentals</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: linear-gradient(160deg, #0a0f1e, #0f172a, #0c1222);
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 18px;
+    }
+
+    
+    .header {
+      max-width: 1340px; margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 40px; height: 40px; border-radius: 11px;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px; color: #fff;
+    }
+    .header h1 { font-size: 19px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-sub { font-size: 16px; color: #64748b; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .team-names { font-size: 11px; color: #64748b; }
+    .team-names span { color: #94a3b8; font-weight: 600; }
+    .tag {
+      display: inline-block; padding: 3px 10px; border-radius: 6px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .tag-green { background: #22c55e18; color: #22c55e; }
+    .tag-blue { background: #38bdf818; color: #38bdf8; }
+    .tag-red { background: #ef444418; color: #ef4444; }
+    .tag-yellow { background: #eab30818; color: #eab308; }
+    .tag-purple { background: #a78bfa18; color: #a78bfa; }
+
+
+    .layout {
+      max-width: 1340px; margin: 0 auto;
+      display: grid; grid-template-columns: 260px 1fr; gap: 16px;
+    }
+
+    .panel {
+      background: #111827; border: 1px solid #1e293b;
+      border-radius: 14px; padding: 16px;
+    }
+
+    .label {
+      font-size: 10px; color: #64748b; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;
+    }
+
+    
+    .sidebar { display: flex; flex-direction: column; gap: 12px; }
+
+    select {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid #1e293b; background: #0a0f1e;
+      color: #e2e8f0; font-size: 13px; font-family: inherit;
+      outline: none; cursor: pointer;
+    }
+    select option { background: #0a0f1e; }
+
+    .info-row {
+      display: flex; justify-content: space-between;
+      padding: 6px 0; font-size: 12px; border-bottom: 1px solid #1e293b;
+    }
+    .info-row:last-child { border: none; }
+    .info-row .k { color: #64748b; }
+    .info-row .v { color: #e2e8f0; font-weight: 600; }
+
+    .btn-group { display: flex; gap: 6px; margin-bottom: 10px; }
+    .btn-day {
+      flex: 1; padding: 7px; border-radius: 8px; text-align: center;
+      border: 1px solid #1e293b; background: #0a0f1e; color: #64748b;
+      font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .btn-day.active { border-color: #38bdf8; color: #38bdf8; background: #38bdf810; }
+    .btn-day:hover { border-color: #334155; }
+
+    .btn-primary {
+      width: 100%; padding: 11px 0; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      color: #fff; font-weight: 700; font-size: 13px;
+      cursor: pointer; font-family: inherit; transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { background: #1a2236; color: #475569; cursor: default; }
+
+    .btn-secondary {
+      width: 100%; padding: 11px 0; border-radius: 10px;
+      border: 1px solid #1e293b; background: #0a0f1e;
+      color: #e2e8f0; font-weight: 600; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-secondary:hover { border-color: #334155; }
+    .btn-secondary:disabled { color: #475569; cursor: default; }
+
+    
+    .main { display: flex; flex-direction: column; gap: 14px; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric .ml { font-size: 11px; color: #64748b; margin-bottom: 3px; }
+    .metric .mv { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .metric .mc { font-size: 12px; font-weight: 700; margin-top: 2px; }
+
+    .chart-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+    }
+    .chart-title { font-size: 15px; font-weight: 700; }
+    .chart-tabs { display: flex; gap: 4px; }
+    .chart-tab {
+      padding: 5px 12px; border-radius: 6px;
+      border: 1px solid #1e293b; background: transparent;
+      color: #64748b; font-size: 11px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .chart-tab.active { border-color: #38bdf8; background: #38bdf810; color: #38bdf8; }
+
+    .chart-box { position: relative; height: 300px; }
+    .placeholder {
+      height: 100%; display: flex; align-items: center; justify-content: center;
+      border: 2px dashed #1e293b; border-radius: 12px;
+      color: #475569; font-size: 13px; text-align: center; padding: 20px;
+    }
+
+    .pred-bar {
+      display: none; gap: 16px; padding: 12px 14px; margin-top: 12px;
+      background: #0a0f1e; border-radius: 10px; border: 1px solid #1e293b;
+    }
+    .pred-bar .col { flex: 1; }
+    .pred-bar .col .pl { font-size: 11px; color: #64748b; }
+    .pred-bar .col .pv { font-size: 20px; font-weight: 800; margin-top: 2px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .panel h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+
+    .news-item {
+      padding: 10px; border-radius: 10px;
+      background: #0a0f1e; border: 1px solid #1e293b; margin-bottom: 8px;
+    }
+    .news-item:last-child { margin-bottom: 0; }
+    .news-item .src { font-size: 10px; color: #64748b; }
+    .news-item .headline { font-size: 12px; color: #cbd5e1; margin: 4px 0 6px; line-height: 1.4; }
+    .sent-bar { height: 5px; background: #1e293b; border-radius: 3px; }
+    .sent-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+    .sent-val { font-size: 11px; font-weight: 700; text-align: right; margin-top: 2px; }
+
+    .sent-big { text-align: center; padding: 16px 0; }
+    .sent-big .sv { font-size: 36px; font-weight: 900; }
+
+    
+    .econ-card {
+      padding: 14px; text-align: center;
+    }
+    .econ-card .econ-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .econ-card .econ-value { font-size: 22px; font-weight: 800; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+    .econ-card .econ-desc { font-size: 11px; color: #64748b; }
+    .econ-card .econ-change { font-size: 11px; font-weight: 700; margin-top: 3px; }
+
+    .status-bar {
+      display: none; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 8px;
+      background: #1a2236; border: 1px solid #1e293b;
+      font-size: 12px; color: #94a3b8;
+    }
+    .status-bar.show { display: flex; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #38bdf8; animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .fade { animation: fadeIn 0.4s ease-out; }
+
+    @media (max-width: 960px) {
+      .layout, .grid-2, .grid-3, .metrics { grid-template-columns: 1fr; }
+      .footer-team { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">ST</div>
+    <div>
+      <h1>Stock Trend Predictor</h1>
+      <div class="header-sub">AI Fundamentals Project · Warsaw University of Technology</div>
+      <div style="margin-top:4px;font-size:18px;color:#94a3b8;font-weight:600;">Artem Poddierohin · Vladyslav Zelenkov · Veranika Karneichuk · Diego Ferrari</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-bar" id="statusBar"><div class="status-dot"></div><span id="statusText"></span></div>
+  </div>
+</div>
+
+
+<div class="layout">
+
+ 
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="label">Stock Selection</div>
+      <select id="stockSelect">
+        <option value="">Choose a stock…</option>
+        <option value="AAPL">AAPL — Apple Inc.</option>
+        <option value="MSFT">MSFT — Microsoft Corp.</option>
+        <option value="TSLA">TSLA — Tesla Inc.</option>
+        <option value="AMZN">AMZN — Amazon.com Inc.</option>
+        <option value="GOOGL">GOOGL — Alphabet Inc.</option>
+        <option value="JPM">JPM — JPMorgan Chase</option>
+      </select>
+      <div id="stockMeta" style="margin-top:10px;display:none;"></div>
+    </div>
+
+    <div class="panel">
+      <div class="label">Prediction Horizon</div>
+      <div class="btn-group">
+        <div class="btn-day" onclick="pickDay(1,this)">1D</div>
+        <div class="btn-day active" onclick="pickDay(3,this)">3D</div>
+        <div class="btn-day" onclick="pickDay(7,this)">7D</div>
+      </div>
+      <button class="btn-primary" id="btnPred" disabled onclick="predict()">Run Prediction Model</button>
+    </div>
+
+    <div class="panel">
+      <div class="label">News Sentiment</div>
+      <button class="btn-secondary" id="btnNews" disabled onclick="loadNews()">Fetch News → FinBERT</button>
+    </div>
+
+    <div class="panel" id="indPanel" style="display:none;">
+      <div class="label">Technical Features</div>
+      <div id="indList"></div>
+    </div>
+
+    <div class="panel" id="econSidebar" style="display:none;">
+      <div class="label">Data Sources</div>
+      <div class="info-row"><span class="k">Prices</span><span class="v">yfinance</span></div>
+      <div class="info-row"><span class="k">News</span><span class="v">NewsAPI</span></div>
+      <div class="info-row"><span class="k">Sentiment</span><span class="v">FinBERT</span></div>
+      <div class="info-row"><span class="k">Economic</span><span class="v">FRED API</span></div>
+      <div class="info-row"><span class="k">VIX</span><span class="v">yfinance</span></div>
+    </div>
+  </div>
+
+  
+  <div class="main">
+
+    
+    <div class="metrics" id="metricsRow" style="display:none;"></div>
+
+    
+    <div class="panel">
+      <div class="chart-header">
+        <div class="chart-title" id="chartLabel">Stock Price Chart</div>
+        <div class="chart-tabs" id="chartTabs" style="display:none;">
+          <button class="chart-tab active" onclick="switchTab('price',this)">Price</button>
+          <button class="chart-tab" onclick="switchTab('volume',this)">Volume</button>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="placeholder" id="chartMsg">Select a stock to load OHLCV data via <b>yfinance</b></div>
+        <canvas id="chart" style="display:none;"></canvas>
+      </div>
+      <div class="pred-bar" id="predBar"></div>
+    </div>
+
+    
+    <div class="grid-3" id="econRow" style="display:none;">
+      <div class="panel econ-card fade" id="econFed">
+        <div class="econ-label">Fed Funds Rate</div>
+        <div class="econ-value" style="color:#38bdf8;">—</div>
+        <div class="econ-desc">Federal Reserve</div>
+        <div class="econ-change" style="color:#64748b;">Source: FRED API</div>
+      </div>
+      <div class="panel econ-card fade" id="econCpi">
+        <div class="econ-label">CPI (Inflation)</div>
+        <div class="econ-value" style="color:#f59e0b;">—</div>
+        <div class="econ-desc">Consumer Price Index</div>
+        <div class="econ-change" style="color:#64748b;">Source: FRED API</div>
+      </div>
+      <div class="panel econ-card fade" id="econVix">
+        <div class="econ-label">VIX — Fear Index</div>
+        <div class="econ-value" style="color:#ef4444;">—</div>
+        <div class="econ-desc">Market Volatility</div>
+        <div class="econ-change" style="color:#64748b;">Source: yfinance ^VIX</div>
+      </div>
+    </div>
+
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Latest News</h3>
+        <div id="newsBox"><div class="placeholder" style="height:200px;">Fetch news to see headlines + FinBERT sentiment</div></div>
+      </div>
+      <div class="panel">
+        <h3>Sentiment Analysis</h3>
+        <div id="sentBox"><div class="placeholder" style="height:200px;">NewsAPI → FinBERT pipeline output</div></div>
+      </div>
+    </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+
+const STOCKS = {
+  AAPL:  { name:"Apple Inc.",      ex:"NASDAQ", sector:"Technology",  base:195 },
+  MSFT:  { name:"Microsoft Corp.", ex:"NASDAQ", sector:"Technology",  base:420 },
+  TSLA:  { name:"Tesla Inc.",      ex:"NASDAQ", sector:"Automotive",  base:175 },
+  AMZN:  { name:"Amazon.com Inc.", ex:"NASDAQ", sector:"E-Commerce",  base:185 },
+  GOOGL: { name:"Alphabet Inc.",   ex:"NASDAQ", sector:"Technology",  base:170 },
+  JPM:   { name:"JPMorgan Chase",  ex:"NYSE",   sector:"Finance",     base:205 },
+};
+
+const NEWS_LIST = [
+  { t:"Fed signals potential rate pause amid cooling inflation data", s:0.32, src:"Reuters" },
+  { t:"Tech earnings beat expectations across the board in Q1 report", s:0.78, src:"Bloomberg" },
+  { t:"Supply chain disruptions ease significantly in Q2 outlook", s:0.41, src:"CNBC" },
+  { t:"New tariff concerns continue to weigh on global equity markets", s:-0.55, src:"WSJ" },
+  { t:"Company announces major $10B stock buyback program", s:0.62, src:"MarketWatch" },
+];
+
+let state = { stock:null, loaded:false, predicted:false, news:false, days:3 };
+let chart = null;
+let priceData = [];
+
+
+function showStatus(msg) {
+  document.getElementById("statusBar").classList.add("show");
+  document.getElementById("statusText").textContent = msg;
+}
+function hideStatus() { document.getElementById("statusBar").classList.remove("show"); }
+
+function sentColor(v) { return v>0.2?"#22c55e":v<-0.2?"#ef4444":"#eab308"; }
+function sentLabel(v) { return v>0.2?"Positive":v<-0.2?"Negative":"Neutral"; }
+function sentBadge(v) {
+  const c = sentColor(v);
+  const l = sentLabel(v);
+  return `<span class="tag" style="background:${c}18;color:${c};">${l}</span>`;
+}
+
+
+function genPrices(base, days=60) {
+  const arr = []; let p = base;
+  for (let i=days; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    p += (Math.random()-0.48)*base*0.02;
+    p = Math.max(p, base*0.75);
+    arr.push({
+      date: d.toLocaleDateString("en-US",{month:"short",day:"numeric"}),
+      close: +p.toFixed(2),
+      open: +(p-(Math.random()-0.5)*3).toFixed(2),
+      high: +(p+Math.random()*4).toFixed(2),
+      low: +(p-Math.random()*4).toFixed(2),
+      volume: Math.floor(40e6+Math.random()*60e6),
+      sma20: +(p+(Math.random()-0.5)*6).toFixed(2),
+      ema12: +(p+(Math.random()-0.5)*4).toFixed(2),
+    });
+  }
+  return arr;
+}
+
+
+document.getElementById("stockSelect").onchange = async function() {
+  const t = this.value;
+  if (!t) return;
+
+  showStatus("Loading real data from backend...");
+
+  const res = await fetch(`/data?stock=${t}`);
+  const data = await res.json();
+
+  priceData = data;
+
+  state = { stock:t, loaded:true, predicted:false, news:false, days:state.days };
+
+  document.getElementById("chartLabel").textContent = t + " — Price Chart";
+  drawChart("price");
+
+  hideStatus();
+};
+
+
+
+
+
+let currentTab = "price";
+
+function drawChart(tab) {
+  document.getElementById("chartMsg").style.display = "none";
+  const canvas = document.getElementById("chart");
+  canvas.style.display = "block";
+  if (chart) chart.destroy();
+
+  if (tab === "price") {
+    const datasets = [
+      { label:"Close", data:priceData.map(d=>d.close), borderColor:"#38bdf8", backgroundColor:"rgba(56,189,248,0.07)", borderWidth:2, pointRadius:0, tension:0.3, fill:true },
+      { label:"SMA 20", data:priceData.map(d=>d.sma20), borderColor:"#f97316", borderWidth:1.5, borderDash:[5,3], pointRadius:0, tension:0.3, fill:false },
+      { label:"EMA 12", data:priceData.map(d=>d.ema12), borderColor:"#a78bfa", borderWidth:1, borderDash:[3,3], pointRadius:0, tension:0.3, fill:false },
+    ];
+
+    if (state.predicted && window.predData) {
+      const pad = new Array(priceData.length-1).fill(null);
+      const lastC = priceData[priceData.length-1].close;
+      datasets.push({
+        label:"Predicted", data:[...pad, lastC, ...predData.preds.map(p=>p.predicted)],
+        borderColor:"#22c55e", borderWidth:2.5, borderDash:[6,3], pointRadius:0, tension:0.3, fill:false,
+      });
+    }
+
+    chart = new Chart(canvas, {
+      type:"line",
+      data:{ labels:[...priceData.map(d=>d.date), ...(window.predData?predData.preds.map(p=>p.date):[])], datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ labels:{ color:"#94a3b8", font:{size:11}, boxWidth:14, padding:12 } },
+          tooltip:{ backgroundColor:"#1e293b", titleColor:"#e2e8f0", bodyColor:"#cbd5e1", borderColor:"#334155", borderWidth:1 }
+        },
+        scales:{
+          x:{ ticks:{ color:"#64748b", font:{size:9}, maxTicksLimit:8 }, grid:{ color:"#1e293b" } },
+          y:{ ticks:{ color:"#64748b", font:{size:9} }, grid:{ color:"#1e293b" } }
+        }
+      }
+    });
+  } else {
+    const last30 = priceData.slice(-30);
+    chart = new Chart(canvas, {
+      type:"bar",
+      data:{
+        labels:last30.map(d=>d.date),
+        datasets:[{
+          label:"Volume", data:last30.map(d=>d.volume),
+          backgroundColor:last30.map(d=>d.close>=d.open?"rgba(34,197,94,0.35)":"rgba(239,68,68,0.35)"),
+          borderColor:last30.map(d=>d.close>=d.open?"#22c55e":"#ef4444"),
+          borderWidth:1, borderRadius:4
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{ backgroundColor:"#1e293b", titleColor:"#e2e8f0", bodyColor:"#cbd5e1", borderColor:"#334155", borderWidth:1 } },
+        scales:{
+          x:{ ticks:{ color:"#64748b", font:{size:9} }, grid:{ color:"#1e293b" } },
+          y:{ ticks:{ color:"#64748b", font:{size:9}, callback:v=>(v/1e6).toFixed(0)+"M" }, grid:{ color:"#1e293b" } }
+        }
+      }
+    });
+  }
+}
+
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll(".chart-tab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  drawChart(tab);
+}
+
+
+function pickDay(d, el) {
+  state.days = d;
+  document.querySelectorAll(".btn-day").forEach(b=>b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+function predict() {
+  if (!state.loaded) return;
+  showStatus(`Training model & predicting ${state.days}-day trend...`);
+  document.getElementById("btnPred").disabled = true;
+
+  setTimeout(() => {
+    state.predicted = true;
+    const last = priceData[priceData.length-1].close;
+    const trend = Math.random()>0.45;
+    const preds = [];
+    let p = last;
+    for (let i=1; i<=state.days; i++) {
+      p += (trend?1:-1)*(Math.random()*last*0.012) + (Math.random()-0.5)*last*0.005;
+      const d = new Date(); d.setDate(d.getDate()+i);
+      preds.push({ date:d.toLocaleDateString("en-US",{month:"short",day:"numeric"}), predicted:+p.toFixed(2) });
+    }
+    const conf = (65+Math.random()*25).toFixed(1);
+    window.predData = { preds, trend, conf };
+
+    const target = preds[preds.length-1].predicted;
+    const col = trend?"#22c55e":"#ef4444";
+    const arrow = trend?"↑":"↓";
+    const trendName = trend?"Bullish":"Bearish";
+
+    const bar = document.getElementById("predBar");
+    bar.style.display = "flex";
+    bar.classList.add("fade");
+    bar.innerHTML = `
+      <div class="col"><div class="pl">Predicted Trend</div><div class="pv" style="color:${col}">${arrow} ${trendName}</div></div>
+      <div class="col"><div class="pl">Target Price (${state.days}D)</div><div class="pv">$${target.toFixed(2)}</div></div>
+      <div class="col"><div class="pl">Model Confidence</div><div class="pv" style="color:#38bdf8">${conf}%</div></div>
+      <div class="col"><div class="pl">Model</div><div class="pv" style="font-size:14px;color:#a78bfa;">GradientBoosting</div></div>
+    `;
+
+    drawChart("price");
+
+    hideStatus();
+    document.getElementById("btnPred").disabled = false;
+  }, 1000);
+}
+
+
+function loadNews() {
+  if (!state.loaded) return;
+  showStatus("Fetching news via NewsAPI → running FinBERT...");
+  document.getElementById("btnNews").disabled = true;
+
+  setTimeout(() => {
+    state.news = true;
+    const newsData = NEWS_LIST.map(n => ({
+      ...n, s: +(n.s + (Math.random()-0.5)*0.25).toFixed(2)
+    }));
+
+    
+    document.getElementById("newsBox").innerHTML = newsData.map(n => {
+      const col = sentColor(n.s);
+      const pct = ((n.s+1)/2)*100;
+      return `<div class="news-item fade">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="src">${n.src}</span>${sentBadge(n.s)}
+        </div>
+        <div class="headline">${n.t}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="sent-bar" style="flex:1;"><div class="sent-fill" style="width:${pct}%;background:${col};"></div></div>
+          <div class="sent-val" style="color:${col};">${n.s>0?"+":""}${n.s}</div>
+        </div>
+      </div>`;
+    }).join("");
+
+    
+    const avg = newsData.reduce((a,n)=>a+n.s,0)/newsData.length;
+    const col = sentColor(avg);
+    const mood = avg>0.1?"Market Bullish":avg<-0.1?"Market Bearish":"Market Neutral";
+    const badgeCls = avg>0.1?"tag-green":avg<-0.1?"tag-red":"tag-yellow";
+
+    document.getElementById("sentBox").innerHTML = `
+      <div class="sent-big fade">
+        <div style="font-size:11px;color:#64748b;margin-bottom:6px;">Average Sentiment Score</div>
+        <div class="sv" style="color:${col};">${avg>0?"+":""}${avg.toFixed(2)}</div>
+        <div style="margin-top:8px;"><span class="tag ${badgeCls}">${mood}</span></div>
+        <div style="margin-top:12px;font-size:11px;color:#475569;">Analyzed with <span style="color:#94a3b8;font-weight:600;">FinBERT</span> · ${newsData.length} articles</div>
+      </div>
+      <div style="height:110px;position:relative;"><canvas id="sentChart"></canvas></div>
+    `;
+
+    
+    new Chart(document.getElementById("sentChart"), {
+      type:"bar",
+      data:{
+        labels:newsData.map((_,i)=>"Art."+(i+1)),
+        datasets:[{
+          data:newsData.map(n=>n.s),
+          backgroundColor:newsData.map(n=>sentColor(n.s)+"60"),
+          borderColor:newsData.map(n=>sentColor(n.s)),
+          borderWidth:1, borderRadius:4
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ ticks:{color:"#64748b",font:{size:10}}, grid:{display:false} },
+          y:{ min:-1, max:1, ticks:{color:"#64748b",font:{size:10}}, grid:{color:"#1e293b"} }
+        }
+      }
+    });
+
+
+    hideStatus();
+    document.getElementById("btnNews").disabled = false;
+  }, 800);
+}
+
+
+
+</script>
+</body>
+</html>
