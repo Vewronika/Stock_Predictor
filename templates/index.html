@@ -238,11 +238,12 @@
         <div class="btn-day" onclick="pickDay(7,this)">7D</div>
       </div>
       <button class="btn-primary" id="btnPred" disabled onclick="predict()">Run Prediction Model</button>
+      <button class="btn-secondary" id="btnRetrain" disabled onclick="retrain()" style="margin-top:8px;">↺ Re-train Models</button>
     </div>
 
     <div class="panel">
       <div class="label">News Sentiment</div>
-      <button class="btn-secondary" id="btnNews" disabled onclick="loadNews()">Fetch News → FinBERT</button>
+      <button class="btn-secondary" id="btnNews" disabled onclick="loadNews()">Fetch News → VADER</button>
     </div>
 
     <div class="panel" id="indPanel" style="display:none;">
@@ -254,7 +255,7 @@
       <div class="label">Data Sources</div>
       <div class="info-row"><span class="k">Prices</span><span class="v">yfinance</span></div>
       <div class="info-row"><span class="k">News</span><span class="v">NewsAPI</span></div>
-      <div class="info-row"><span class="k">Sentiment</span><span class="v">FinBERT</span></div>
+      <div class="info-row"><span class="k">Sentiment</span><span class="v">VADER</span></div>
       <div class="info-row"><span class="k">Economic</span><span class="v">FRED API</span></div>
       <div class="info-row"><span class="k">VIX</span><span class="v">yfinance</span></div>
     </div>
@@ -325,23 +326,15 @@
 <script>
 
 const STOCKS = {
-  AAPL:  { name:"Apple Inc.",      ex:"NASDAQ", sector:"Technology",  base:195 },
-  MSFT:  { name:"Microsoft Corp.", ex:"NASDAQ", sector:"Technology",  base:420 },
-  TSLA:  { name:"Tesla Inc.",      ex:"NASDAQ", sector:"Automotive",  base:175 },
-  AMZN:  { name:"Amazon.com Inc.", ex:"NASDAQ", sector:"E-Commerce",  base:185 },
-  GOOGL: { name:"Alphabet Inc.",   ex:"NASDAQ", sector:"Technology",  base:170 },
-  JPM:   { name:"JPMorgan Chase",  ex:"NYSE",   sector:"Finance",     base:205 },
+  AAPL:  { name:"Apple Inc.",      ex:"NASDAQ", sector:"Technology" },
+  MSFT:  { name:"Microsoft Corp.", ex:"NASDAQ", sector:"Technology" },
+  TSLA:  { name:"Tesla Inc.",      ex:"NASDAQ", sector:"Automotive" },
+  AMZN:  { name:"Amazon.com Inc.", ex:"NASDAQ", sector:"E-Commerce" },
+  GOOGL: { name:"Alphabet Inc.",   ex:"NASDAQ", sector:"Technology" },
+  JPM:   { name:"JPMorgan Chase",  ex:"NYSE",   sector:"Finance"    },
 };
 
-const NEWS_LIST = [
-  { t:"Fed signals potential rate pause amid cooling inflation data", s:0.32, src:"Reuters" },
-  { t:"Tech earnings beat expectations across the board in Q1 report", s:0.78, src:"Bloomberg" },
-  { t:"Supply chain disruptions ease significantly in Q2 outlook", s:0.41, src:"CNBC" },
-  { t:"New tariff concerns continue to weigh on global equity markets", s:-0.55, src:"WSJ" },
-  { t:"Company announces major $10B stock buyback program", s:0.62, src:"MarketWatch" },
-];
-
-let state = { stock:null, loaded:false, predicted:false, news:false, days:3 };
+let state = { stock:null, loaded:false, predicted:false, news:false, days:3, newsRemaining:3 };
 let chart = null;
 let priceData = [];
 
@@ -352,53 +345,110 @@ function showStatus(msg) {
 }
 function hideStatus() { document.getElementById("statusBar").classList.remove("show"); }
 
-function sentColor(v) { return v>0.2?"#22c55e":v<-0.2?"#ef4444":"#eab308"; }
-function sentLabel(v) { return v>0.2?"Positive":v<-0.2?"Negative":"Neutral"; }
+function sentColor(v) { return v > 0.05 ? "#22c55e" : v < -0.05 ? "#ef4444" : "#eab308"; }
+function sentLabel(v) { return v > 0.05 ? "Bullish" : v < -0.05 ? "Bearish" : "Neutral"; }
 function sentBadge(v) {
-  const c = sentColor(v);
-  const l = sentLabel(v);
+  const c = sentColor(v), l = sentLabel(v);
   return `<span class="tag" style="background:${c}18;color:${c};">${l}</span>`;
 }
 
-
-function genPrices(base, days=60) {
-  const arr = []; let p = base;
-  for (let i=days; i>=0; i--) {
-    const d = new Date(); d.setDate(d.getDate()-i);
-    p += (Math.random()-0.48)*base*0.02;
-    p = Math.max(p, base*0.75);
-    arr.push({
-      date: d.toLocaleDateString("en-US",{month:"short",day:"numeric"}),
-      close: +p.toFixed(2),
-      open: +(p-(Math.random()-0.5)*3).toFixed(2),
-      high: +(p+Math.random()*4).toFixed(2),
-      low: +(p-Math.random()*4).toFixed(2),
-      volume: Math.floor(40e6+Math.random()*60e6),
-      sma20: +(p+(Math.random()-0.5)*6).toFixed(2),
-      ema12: +(p+(Math.random()-0.5)*4).toFixed(2),
-    });
-  }
-  return arr;
+function rsiColor(v) {
+  if (v === null || v === undefined) return "#64748b";
+  return v < 30 ? "#22c55e" : v > 70 ? "#ef4444" : "#e2e8f0";
 }
 
+function updateNewsBtnLabel(remaining) {
+  state.newsRemaining = remaining;
+  const btn = document.getElementById("btnNews");
+  if (remaining <= 0) {
+    btn.textContent = "News limit reached (0 left)";
+    btn.disabled = true;
+  } else {
+    btn.textContent = `Fetch News → VADER (${remaining} left)`;
+    btn.disabled = false;
+  }
+}
 
 document.getElementById("stockSelect").onchange = async function() {
   const t = this.value;
   if (!t) return;
 
-  showStatus("Loading real data from backend...");
+  document.getElementById("btnPred").disabled = true;
+  document.getElementById("btnNews").disabled = true;
+  showStatus(`Loading ${t} data…`);
 
-  const res = await fetch(`/data?stock=${t}`);
-  const data = await res.json();
+  try {
+    const [dataRes, econRes, remainRes] = await Promise.all([
+      fetch(`/data?stock=${t}`),
+      fetch("/econ"),
+      fetch(`/news/remaining?stock=${t}`),
+    ]);
+    priceData = await dataRes.json();
+    const econ = await econRes.json();
+    const { remaining } = await remainRes.json();
 
-  priceData = data;
+    state = { stock:t, loaded:true, predicted:false, news:false, days:state.days, newsRemaining:remaining };
 
-  state = { stock:t, loaded:true, predicted:false, news:false, days:state.days };
+    const last = priceData[priceData.length - 1];
+    const prev = priceData.length > 1 ? priceData[priceData.length - 2] : last;
+    const change = last.close - prev.close;
+    const changePct = (change / prev.close * 100).toFixed(2);
+    const chgCol = change >= 0 ? "#22c55e" : "#ef4444";
+    const sign = change >= 0 ? "+" : "";
 
-  document.getElementById("chartLabel").textContent = t + " — Price Chart";
-  drawChart("price");
+    document.getElementById("metricsRow").style.display = "grid";
+    document.getElementById("metricsRow").innerHTML = `
+      <div class="panel metric">
+        <div class="ml">Current Price</div>
+        <div class="mv">$${last.close.toFixed(2)}</div>
+        <div class="mc" style="color:${chgCol}">${sign}${change.toFixed(2)} (${sign}${changePct}%)</div>
+      </div>
+      <div class="panel metric">
+        <div class="ml">Volume</div>
+        <div class="mv">${(last.volume / 1e6).toFixed(2)}M</div>
+        <div class="mc" style="color:#64748b">shares traded</div>
+      </div>
+      <div class="panel metric">
+        <div class="ml">RSI 14</div>
+        <div class="mv" style="color:${rsiColor(last.rsi14)}">${last.rsi14 !== null ? last.rsi14.toFixed(1) : "—"}</div>
+        <div class="mc" style="color:#64748b">${last.rsi14 < 30 ? "Oversold" : last.rsi14 > 70 ? "Overbought" : "Neutral"}</div>
+      </div>
+      <div class="panel metric">
+        <div class="ml">SMA 20</div>
+        <div class="mv">${last.sma20 !== null ? "$" + last.sma20.toFixed(2) : "—"}</div>
+        <div class="mc" style="color:#f97316">20-day average</div>
+      </div>
+    `;
 
-  hideStatus();
+    document.getElementById("indPanel").style.display = "block";
+    document.getElementById("indList").innerHTML = `
+      <div class="info-row"><span class="k">SMA 20</span><span class="v">${last.sma20 !== null ? "$" + last.sma20.toFixed(2) : "—"}</span></div>
+      <div class="info-row"><span class="k">EMA 12</span><span class="v">${last.ema12 !== null ? "$" + last.ema12.toFixed(2) : "—"}</span></div>
+      <div class="info-row"><span class="k">RSI 14</span><span class="v" style="color:${rsiColor(last.rsi14)}">${last.rsi14 !== null ? last.rsi14.toFixed(1) : "—"}</span></div>
+      <div class="info-row"><span class="k">MACD</span><span class="v" style="color:${last.macd !== null && last.macd >= 0 ? "#22c55e" : "#ef4444"}">${last.macd !== null ? last.macd.toFixed(3) : "—"}</span></div>
+    `;
+
+    document.getElementById("econSidebar").style.display = "block";
+    document.getElementById("econRow").style.display = "grid";
+    document.getElementById("econFed").querySelector(".econ-value").textContent = econ.fed_rate ? econ.fed_rate.toFixed(2) + "%" : "—";
+    document.getElementById("econCpi").querySelector(".econ-value").textContent = econ.cpi ? econ.cpi.toFixed(1) + "%" : "—";
+    document.getElementById("econVix").querySelector(".econ-value").textContent = econ.vix ? econ.vix.toFixed(2) : "—";
+
+    document.getElementById("chartLabel").textContent = `${t} — ${STOCKS[t].name}`;
+    document.getElementById("chartTabs").style.display = "flex";
+    window.predData = null;
+    drawChart("price");
+
+    document.getElementById("btnPred").disabled = false;
+    document.getElementById("btnRetrain").disabled = false;
+    updateNewsBtnLabel(remaining);
+
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Failed to load data: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    hideStatus();
+  }
 };
 
 
@@ -483,100 +533,117 @@ function pickDay(d, el) {
   el.classList.add("active");
 }
 
-function predict() {
+async function predict() {
   if (!state.loaded) return;
-  showStatus(`Training model & predicting ${state.days}-day trend...`);
+  showStatus(`Training Random Forest · predicting ${state.days}-day horizon…`);
   document.getElementById("btnPred").disabled = true;
 
-  setTimeout(() => {
-    state.predicted = true;
-    const last = priceData[priceData.length-1].close;
-    const trend = Math.random()>0.45;
-    const preds = [];
-    let p = last;
-    for (let i=1; i<=state.days; i++) {
-      p += (trend?1:-1)*(Math.random()*last*0.012) + (Math.random()-0.5)*last*0.005;
-      const d = new Date(); d.setDate(d.getDate()+i);
-      preds.push({ date:d.toLocaleDateString("en-US",{month:"short",day:"numeric"}), predicted:+p.toFixed(2) });
-    }
-    const conf = (65+Math.random()*25).toFixed(1);
-    window.predData = { preds, trend, conf };
+  let success = false;
+  try {
+    const res = await fetch(`/predict?stock=${state.stock}&days=${state.days}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-    const target = preds[preds.length-1].predicted;
-    const col = trend?"#22c55e":"#ef4444";
-    const arrow = trend?"↑":"↓";
-    const trendName = trend?"Bullish":"Bearish";
+    state.predicted = true;
+    window.predData = {
+      preds: data.predictions.map(p => ({ date: p.date, predicted: p.price })),
+      trend: data.trend === "up",
+    };
+
+    const col       = data.trend === "up" ? "#22c55e" : "#ef4444";
+    const arrow     = data.trend === "up" ? "↑" : "↓";
+    const trendName = data.trend === "up" ? "Bullish" : "Bearish";
+    const confPct   = (data.confidence * 100).toFixed(1);
 
     const bar = document.getElementById("predBar");
     bar.style.display = "flex";
     bar.classList.add("fade");
     bar.innerHTML = `
       <div class="col"><div class="pl">Predicted Trend</div><div class="pv" style="color:${col}">${arrow} ${trendName}</div></div>
-      <div class="col"><div class="pl">Target Price (${state.days}D)</div><div class="pv">$${target.toFixed(2)}</div></div>
-      <div class="col"><div class="pl">Model Confidence</div><div class="pv" style="color:#38bdf8">${conf}%</div></div>
-      <div class="col"><div class="pl">Model</div><div class="pv" style="font-size:14px;color:#a78bfa;">GradientBoosting</div></div>
+      <div class="col"><div class="pl">Target Price (${state.days}D)</div><div class="pv">$${data.target_price.toFixed(2)}</div></div>
+      <div class="col"><div class="pl">Directional Accuracy</div><div class="pv" style="color:#38bdf8">${confPct}%</div></div>
+      <div class="col"><div class="pl">Model</div><div class="pv" style="font-size:14px;color:#a78bfa;">${data.model}</div></div>
     `;
 
     drawChart("price");
-
-    hideStatus();
+    success = true;
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Prediction failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    if (success) hideStatus();
     document.getElementById("btnPred").disabled = false;
-  }, 1000);
+  }
 }
 
 
-function loadNews() {
+async function loadNews() {
   if (!state.loaded) return;
-  showStatus("Fetching news via NewsAPI → running FinBERT...");
+  showStatus("Fetching news → VADER sentiment analysis…");
   document.getElementById("btnNews").disabled = true;
 
-  setTimeout(() => {
-    state.news = true;
-    const newsData = NEWS_LIST.map(n => ({
-      ...n, s: +(n.s + (Math.random()-0.5)*0.25).toFixed(2)
-    }));
+  let success = false;
+  try {
+    const res = await fetch(`/news?stock=${state.stock}`);
+    const data = await res.json();
 
-    
-    document.getElementById("newsBox").innerHTML = newsData.map(n => {
-      const col = sentColor(n.s);
-      const pct = ((n.s+1)/2)*100;
+    if (data.error === "rate_limit") {
+      updateNewsBtnLabel(0);
+      document.getElementById("statusText").textContent = data.message;
+      setTimeout(hideStatus, 4000);
+      return;
+    }
+    if (data.error) throw new Error(data.error);
+
+    state.news = true;
+    updateNewsBtnLabel(data.remaining_fetches);
+
+    document.getElementById("newsBox").innerHTML = data.articles.map(n => {
+      const col = sentColor(n.sentiment);
+      const pct = ((n.sentiment + 1) / 2) * 100;
+      const href = n.url ? `href="${n.url}" target="_blank" rel="noopener"` : "";
       return `<div class="news-item fade">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="src">${n.src}</span>${sentBadge(n.s)}
+          <span class="src">${n.source} · ${n.published_at.slice(0,10)}</span>${sentBadge(n.sentiment)}
         </div>
-        <div class="headline">${n.t}</div>
+        <div class="headline"><a ${href} style="color:inherit;text-decoration:none;">${n.title}</a></div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div class="sent-bar" style="flex:1;"><div class="sent-fill" style="width:${pct}%;background:${col};"></div></div>
-          <div class="sent-val" style="color:${col};">${n.s>0?"+":""}${n.s}</div>
+          <div class="sent-val" style="color:${col};">${n.sentiment > 0 ? "+" : ""}${n.sentiment.toFixed(3)}</div>
         </div>
       </div>`;
     }).join("");
 
-    
-    const avg = newsData.reduce((a,n)=>a+n.s,0)/newsData.length;
-    const col = sentColor(avg);
-    const mood = avg>0.1?"Market Bullish":avg<-0.1?"Market Bearish":"Market Neutral";
-    const badgeCls = avg>0.1?"tag-green":avg<-0.1?"tag-red":"tag-yellow";
+    const avg     = data.avg_sentiment;
+    const col     = sentColor(avg);
+    const mood    = avg > 0.05 ? "Market Bullish" : avg < -0.05 ? "Market Bearish" : "Market Neutral";
+    const badgeCls= avg > 0.05 ? "tag-green" : avg < -0.05 ? "tag-red" : "tag-yellow";
+    const demoNote= data.demo_mode
+      ? `<div style="margin-top:6px;font-size:10px;color:#475569;">Demo mode — set FINNHUB_KEY or NEWSAPI_KEY for live news</div>`
+      : "";
 
     document.getElementById("sentBox").innerHTML = `
       <div class="sent-big fade">
         <div style="font-size:11px;color:#64748b;margin-bottom:6px;">Average Sentiment Score</div>
-        <div class="sv" style="color:${col};">${avg>0?"+":""}${avg.toFixed(2)}</div>
+        <div class="sv" style="color:${col};">${avg >= 0 ? "+" : ""}${avg.toFixed(3)}</div>
         <div style="margin-top:8px;"><span class="tag ${badgeCls}">${mood}</span></div>
-        <div style="margin-top:12px;font-size:11px;color:#475569;">Analyzed with <span style="color:#94a3b8;font-weight:600;">FinBERT</span> · ${newsData.length} articles</div>
+        <div style="margin-top:12px;font-size:11px;color:#475569;">
+          VADER · ${data.articles.length} articles ·
+          <span style="color:#94a3b8;font-weight:600;">${data.source}</span>
+        </div>
+        ${demoNote}
       </div>
       <div style="height:110px;position:relative;"><canvas id="sentChart"></canvas></div>
     `;
 
-    
     new Chart(document.getElementById("sentChart"), {
       type:"bar",
       data:{
-        labels:newsData.map((_,i)=>"Art."+(i+1)),
+        labels: data.articles.map((_, i) => "Art." + (i + 1)),
         datasets:[{
-          data:newsData.map(n=>n.s),
-          backgroundColor:newsData.map(n=>sentColor(n.s)+"60"),
-          borderColor:newsData.map(n=>sentColor(n.s)),
+          data: data.articles.map(n => n.sentiment),
+          backgroundColor: data.articles.map(n => sentColor(n.sentiment) + "60"),
+          borderColor:      data.articles.map(n => sentColor(n.sentiment)),
           borderWidth:1, borderRadius:4
         }]
       },
@@ -590,13 +657,44 @@ function loadNews() {
       }
     });
 
-
-    hideStatus();
-    document.getElementById("btnNews").disabled = false;
-  }, 800);
+    success = true;
+  } catch (err) {
+    document.getElementById("statusText").textContent = "News fetch failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    if (success) hideStatus();
+    if (state.newsRemaining > 0) document.getElementById("btnNews").disabled = false;
+  }
 }
 
+// ---------------------------------------------------------------------------
+// Re-train (forces fresh training for all horizons of the selected stock)
+// ---------------------------------------------------------------------------
+async function retrain() {
+  if (!state.loaded) return;
+  showStatus(`Re-training ${state.stock} — all horizons…`);
+  document.getElementById("btnRetrain").disabled = true;
+  document.getElementById("btnPred").disabled = true;
 
+  try {
+    const res = await fetch(`/retrain?stock=${state.stock}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById("statusText").textContent =
+      `${state.stock} retrained — ` +
+      `1D: ${(data.results["1d"].confidence * 100).toFixed(1)}%  ` +
+      `3D: ${(data.results["3d"].confidence * 100).toFixed(1)}%  ` +
+      `7D: ${(data.results["7d"].confidence * 100).toFixed(1)}%`;
+    setTimeout(hideStatus, 5000);
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Retraining failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    document.getElementById("btnRetrain").disabled = false;
+    document.getElementById("btnPred").disabled = false;
+  }
+}
 
 </script>
 </body>

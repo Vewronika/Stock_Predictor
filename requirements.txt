@@ -1,0 +1,8 @@
+flask
+yfinance
+pandas
+numpy
+scikit-learn
+joblib
+vaderSentiment
+requests
