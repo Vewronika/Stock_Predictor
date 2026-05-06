@@ -55,8 +55,12 @@ def get_stock_data(ticker: str = "AAPL") -> list[dict]:
     return result
 
 
-def get_features(ticker: str, period: str = "2y") -> pd.DataFrame:
-    """Build feature DataFrame for ML model training."""
+def get_features(ticker: str, period: str = "3y", horizon: int = 1) -> pd.DataFrame:
+    """Build feature DataFrame for ML model training.
+
+    Longer horizons get additional long-term features so the model has
+    signals that match the prediction window, not just short-term noise.
+    """
     df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
 
     if df.empty:
@@ -73,7 +77,7 @@ def get_features(ticker: str, period: str = "2y") -> pd.DataFrame:
     feat["hl_spread"] = (df["High"] - df["Low"]) / df["Close"]
     feat["oc_spread"] = (df["Close"] - df["Open"]) / df["Open"]
 
-    # Lag features
+    # Lag features (short-term, always present)
     for lag in [1, 2, 3, 5, 10]:
         feat[f"close_lag{lag}"] = df["Close"].shift(lag)
 
@@ -98,11 +102,44 @@ def get_features(ticker: str, period: str = "2y") -> pd.DataFrame:
     band_width = (bb_upper - bb_lower).replace(0, np.nan)
     feat["bb_position"] = (df["Close"] - bb_lower) / band_width
 
+    # Realized volatility (20-day rolling std of daily returns)
+    feat["vol_20d"] = df["Close"].pct_change().rolling(20).std()
+
     # Volume ratio vs 20-day average
     feat["vol_sma20"] = df["Volume"].rolling(20).mean()
     feat["vol_ratio"] = df["Volume"] / feat["vol_sma20"]
 
     # Day of week (0 = Monday)
     feat["day_of_week"] = df.index.dayofweek
+
+    # ------------------------------------------------------------------
+    # Longer-horizon features: only added when horizon >= 3 or >= 7.
+    # Short-term indicators are noisy over multi-day windows; trend and
+    # mean-reversion signals at matching timescales carry more signal.
+    # ------------------------------------------------------------------
+    if horizon >= 3:
+        feat["close_lag15"] = df["Close"].shift(15)
+        feat["close_lag20"] = df["Close"].shift(20)
+        feat["ret_10d"] = df["Close"].pct_change(10)
+        sma50 = df["Close"].rolling(50).mean()
+        feat["sma50"] = sma50
+        feat["sma50_ratio"] = df["Close"] / sma50
+        feat["vol_60d"] = df["Close"].pct_change().rolling(60).std()
+
+    if horizon >= 7:
+        feat["close_lag30"] = df["Close"].shift(30)
+        feat["ret_30d"] = df["Close"].pct_change(30)
+        feat["ret_60d"] = df["Close"].pct_change(60)
+        sma100 = df["Close"].rolling(100).mean()
+        sma200 = df["Close"].rolling(200).mean()
+        feat["sma100"] = sma100
+        feat["sma200"] = sma200
+        feat["sma100_ratio"] = df["Close"] / sma100
+        feat["sma200_ratio"] = df["Close"] / sma200
+        # Distance from 52-week high/low captures mean-reversion tendency
+        high_52w = df["High"].rolling(252).max()
+        low_52w = df["Low"].rolling(252).min()
+        feat["dist_52w_high"] = (df["Close"] - high_52w) / high_52w
+        feat["dist_52w_low"] = (df["Close"] - low_52w) / low_52w
 
     return feat.dropna()

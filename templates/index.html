@@ -90,6 +90,15 @@
     .btn-day.active { border-color: #38bdf8; color: #38bdf8; background: #38bdf810; }
     .btn-day:hover { border-color: #334155; }
 
+    .btn-model {
+      flex: 1; padding: 7px; border-radius: 8px; text-align: center;
+      border: 1px solid #1e293b; background: #0a0f1e; color: #64748b;
+      font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .btn-model.active { border-color: #a78bfa; color: #a78bfa; background: #a78bfa10; }
+    .btn-model:hover { border-color: #334155; }
+
     .btn-primary {
       width: 100%; padding: 11px 0; border-radius: 10px; border: none;
       background: linear-gradient(135deg, #38bdf8, #6366f1);
@@ -237,6 +246,11 @@
         <div class="btn-day active" onclick="pickDay(3,this)">3D</div>
         <div class="btn-day" onclick="pickDay(7,this)">7D</div>
       </div>
+      <div class="label" style="margin-top:10px;">Algorithm</div>
+      <div class="btn-group">
+        <div class="btn-model active" onclick="pickModel('rf',this)">Random Forest</div>
+        <div class="btn-model" onclick="pickModel('gb',this)">Grad. Boost</div>
+      </div>
       <button class="btn-primary" id="btnPred" disabled onclick="predict()">Run Prediction Model</button>
       <button class="btn-secondary" id="btnRetrain" disabled onclick="retrain()" style="margin-top:8px;">↺ Re-train Models</button>
     </div>
@@ -334,7 +348,7 @@ const STOCKS = {
   JPM:   { name:"JPMorgan Chase",  ex:"NYSE",   sector:"Finance"    },
 };
 
-let state = { stock:null, loaded:false, predicted:false, news:false, days:3, newsRemaining:3 };
+let state = { stock:null, loaded:false, predicted:false, news:false, days:3, newsRemaining:3, model:"rf" };
 let chart = null;
 let priceData = [];
 
@@ -347,6 +361,14 @@ function hideStatus() { document.getElementById("statusBar").classList.remove("s
 
 function sentColor(v) { return v > 0.05 ? "#22c55e" : v < -0.05 ? "#ef4444" : "#eab308"; }
 function sentLabel(v) { return v > 0.05 ? "Bullish" : v < -0.05 ? "Bearish" : "Neutral"; }
+
+function trendLabel(changePct) {
+  if (changePct >=  2.0) return { col: "#22c55e", arrow: "↑",  trendName: "Bullish"          };
+  if (changePct >=  0.5) return { col: "#86efac", arrow: "↗",  trendName: "Slightly Bullish"  };
+  if (changePct >= -0.5) return { col: "#eab308", arrow: "→",  trendName: "Neutral"           };
+  if (changePct >= -2.0) return { col: "#fb923c", arrow: "↘",  trendName: "Slightly Bearish"  };
+                         return { col: "#ef4444", arrow: "↓",  trendName: "Bearish"           };
+}
 function sentBadge(v) {
   const c = sentColor(v), l = sentLabel(v);
   return `<span class="tag" style="background:${c}18;color:${c};">${l}</span>`;
@@ -529,7 +551,13 @@ function switchTab(tab, btn) {
 
 function pickDay(d, el) {
   state.days = d;
-  document.querySelectorAll(".btn-day").forEach(b=>b.classList.remove("active"));
+  el.closest(".btn-group").querySelectorAll(".btn-day").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+function pickModel(m, el) {
+  state.model = m;
+  el.closest(".btn-group").querySelectorAll(".btn-model").forEach(b => b.classList.remove("active"));
   el.classList.add("active");
 }
 
@@ -540,7 +568,7 @@ async function predict() {
 
   let success = false;
   try {
-    const res = await fetch(`/predict?stock=${state.stock}&days=${state.days}`);
+    const res = await fetch(`/predict?stock=${state.stock}&days=${state.days}&model=${state.model}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
@@ -550,17 +578,26 @@ async function predict() {
       trend: data.trend === "up",
     };
 
-    const col       = data.trend === "up" ? "#22c55e" : "#ef4444";
-    const arrow     = data.trend === "up" ? "↑" : "↓";
-    const trendName = data.trend === "up" ? "Bullish" : "Bearish";
+    const changePct = (data.target_price - data.current_price) / data.current_price * 100;
+    const { col, arrow, trendName } = trendLabel(changePct);
     const confPct   = (data.confidence * 100).toFixed(1);
+
+    let sentHtml = "";
+    if (data.sentiment_adjusted) {
+      const diff = data.target_price - data.raw_rf_price;
+      const sentCol = diff >= 0 ? "#22c55e" : "#ef4444";
+      const sentSign = diff >= 0 ? "+" : "";
+      sentHtml = `<div style="font-size:11px;color:${sentCol};margin-top:4px;">` +
+        `${sentSign}$${Math.abs(diff).toFixed(2)} sentiment ` +
+        `(VADER ${data.sentiment_score >= 0 ? "+" : ""}${data.sentiment_score.toFixed(2)})</div>`;
+    }
 
     const bar = document.getElementById("predBar");
     bar.style.display = "flex";
     bar.classList.add("fade");
     bar.innerHTML = `
       <div class="col"><div class="pl">Predicted Trend</div><div class="pv" style="color:${col}">${arrow} ${trendName}</div></div>
-      <div class="col"><div class="pl">Target Price (${state.days}D)</div><div class="pv">$${data.target_price.toFixed(2)}</div></div>
+      <div class="col"><div class="pl">Target Price (${state.days}D)</div><div class="pv">$${data.target_price.toFixed(2)}</div>${sentHtml}</div>
       <div class="col"><div class="pl">Directional Accuracy</div><div class="pv" style="color:#38bdf8">${confPct}%</div></div>
       <div class="col"><div class="pl">Model</div><div class="pv" style="font-size:14px;color:#a78bfa;">${data.model}</div></div>
     `;
@@ -681,11 +718,13 @@ async function retrain() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
+    const mk = state.model;
+    const r = data.results;
     document.getElementById("statusText").textContent =
-      `${state.stock} retrained — ` +
-      `1D: ${(data.results["1d"].confidence * 100).toFixed(1)}%  ` +
-      `3D: ${(data.results["3d"].confidence * 100).toFixed(1)}%  ` +
-      `7D: ${(data.results["7d"].confidence * 100).toFixed(1)}%`;
+      `${state.stock} retrained — ${mk.toUpperCase()}  ` +
+      `1D: ${(r[`${mk}_1d`].confidence * 100).toFixed(1)}%  ` +
+      `3D: ${(r[`${mk}_3d`].confidence * 100).toFixed(1)}%  ` +
+      `7D: ${(r[`${mk}_7d`].confidence * 100).toFixed(1)}%`;
     setTimeout(hideStatus, 5000);
   } catch (err) {
     document.getElementById("statusText").textContent = "Retraining failed: " + err.message;

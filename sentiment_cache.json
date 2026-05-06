@@ -1,0 +1,22 @@
+{
+  "JPM": {
+    "avg_sentiment": 0.309,
+    "fetched_at": "2026-05-06T13:26:51.375335"
+  },
+  "TSLA": {
+    "avg_sentiment": 0.251,
+    "fetched_at": "2026-05-06T15:11:09.607585"
+  },
+  "AMZN": {
+    "avg_sentiment": 0.666,
+    "fetched_at": "2026-05-06T13:41:13.724485"
+  },
+  "AAPL": {
+    "avg_sentiment": 0.285,
+    "fetched_at": "2026-05-06T15:09:15.997100"
+  },
+  "MSFT": {
+    "avg_sentiment": 0.594,
+    "fetched_at": "2026-05-06T15:34:26.033369"
+  }
+}

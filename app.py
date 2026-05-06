@@ -26,10 +26,13 @@ def data():
 def predict():
     ticker = request.args.get("stock", "AAPL").upper()
     days = request.args.get("days", 3, type=int)
+    model_key = request.args.get("model", "rf").lower()
     if days not in (1, 3, 7):
         days = 3
+    if model_key not in ("rf", "gb"):
+        model_key = "rf"
     try:
-        return jsonify(ml_predict(ticker, days))
+        return jsonify(ml_predict(ticker, days, model_key))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -64,12 +67,13 @@ def retrain():
     ticker = request.args.get("stock", "AAPL").upper()
     try:
         results = {}
-        for horizon in [1, 3, 7]:
-            meta = ml_train(ticker, horizon)
-            results[f"{horizon}d"] = {
-                "confidence": meta["confidence"],
-                "trained_at": meta["trained_at"],
-            }
+        for model_key in ("rf", "gb"):
+            for horizon in [1, 3, 7]:
+                meta = ml_train(ticker, horizon, model_key)
+                results[f"{model_key}_{horizon}d"] = {
+                    "confidence": meta["confidence"],
+                    "trained_at": meta["trained_at"],
+                }
         return jsonify({"ticker": ticker, "results": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

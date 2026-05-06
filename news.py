@@ -8,6 +8,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 RATE_LIMIT = 3
 _RATE_FILE = Path(__file__).parent / "news_rate_limit.json"
+SENTIMENT_CACHE = Path(__file__).parent / "sentiment_cache.json"
 
 COMPANY_NAMES = {
     "AAPL": "Apple",
@@ -161,6 +162,24 @@ def _mock_articles(ticker: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Sentiment cache (shared with model.py for sentiment-adjusted predictions)
+# ---------------------------------------------------------------------------
+
+def _save_sentiment(ticker: str, avg_sentiment: float) -> None:
+    cache: dict = {}
+    if SENTIMENT_CACHE.exists():
+        try:
+            cache = json.loads(SENTIMENT_CACHE.read_text())
+        except Exception:
+            pass
+    cache[ticker] = {
+        "avg_sentiment": avg_sentiment,
+        "fetched_at": datetime.now().isoformat(),
+    }
+    SENTIMENT_CACHE.write_text(json.dumps(cache, indent=2))
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -190,6 +209,9 @@ def fetch_news(ticker: str) -> dict:
     new_remaining = _increment(ticker)
     scores = [a["sentiment"] for a in articles]
     avg = round(sum(scores) / len(scores), 3) if scores else 0.0
+
+    # Persist sentiment so the prediction model can use it
+    _save_sentiment(ticker, avg)
 
     return {
         "ticker": ticker,
