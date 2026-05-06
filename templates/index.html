@@ -380,6 +380,130 @@ function genPrices(base, days=60) {
   }
   return arr;
 }
+function updateMetrics() {
+  const last = priceData[priceData.length - 1];
+  const prev = priceData[priceData.length - 2];
+
+  const change = last.close - prev.close;
+  const pct = (change / prev.close) * 100;
+  const color = change >= 0 ? "#22c55e" : "#ef4444";
+
+  const html = `
+    <div class="panel metric">
+      <div class="ml">Close</div>
+      <div class="mv">$${last.close.toFixed(2)}</div>
+      <div class="mc" style="color:${color}">
+        ${change >= 0 ? "+" : ""}${change.toFixed(2)} (${pct.toFixed(2)}%)
+      </div>
+    </div>
+
+    <div class="panel metric">
+      <div class="ml">Open</div>
+      <div class="mv">$${last.open.toFixed(2)}</div>
+    </div>
+
+    <div class="panel metric">
+      <div class="ml">Day Range</div>
+      <div class="mv">
+        $${last.low.toFixed(2)} — $${last.high.toFixed(2)}
+      </div>
+    </div>
+
+    <div class="panel metric">
+      <div class="ml">Volume</div>
+      <div class="mv">${(last.volume / 1e6).toFixed(1)}M</div>
+    </div>
+
+
+  `;
+
+  const row = document.getElementById("metricsRow");
+  row.innerHTML = html;
+  row.style.display = "grid";
+}
+
+function loadIndicators() {
+  const features = [
+    { name: "SMA 20", desc: "Simple Moving Average (20 days)" },
+    { name: "EMA 12", desc: "Exponential Moving Average" },
+    { name: "RSI", desc: "Relative Strength Index" },
+    { name: "MACD", desc: "Trend momentum indicator" },
+    { name: "Bollinger Bands", desc: "Volatility bands" }
+  ];
+
+  document.getElementById("indList").innerHTML = features.map(f => `
+    <div class="info-row">
+      <span class="k">${f.name}</span>
+      <span class="v">${f.desc}</span>
+    </div>
+  `).join("");
+
+  document.getElementById("indPanel").style.display = "block";
+}
+
+
+
+function updateStockMeta(ticker) {
+  const s = STOCKS[ticker];
+
+  document.getElementById("stockMeta").innerHTML = `
+    <div class="info-row"><span class="k">Name</span><span class="v">${s.name}</span></div>
+    <div class="info-row"><span class="k">Exchange</span><span class="v">${s.ex}</span></div>
+    <div class="info-row"><span class="k">Sector</span><span class="v">${s.sector}</span></div>
+  `;
+
+  document.getElementById("stockMeta").style.display = "block";
+}
+
+
+function updateIndicators() {
+  if (!priceData || priceData.length === 0) return;
+
+  const last = priceData[priceData.length - 1];
+
+  function fmtVol(v) {
+    if (!v) return "-";
+    if (v > 1e9) return (v/1e9).toFixed(1) + "B";
+    if (v > 1e6) return (v/1e6).toFixed(0) + "M";
+    return v;
+  }
+
+  document.getElementById("indList").innerHTML = `
+    <div class="info-row">
+      <span class="k">RSI (14)</span>
+      <span class="v">${last.rsi14?.toFixed(1) || "-"}</span>
+    </div>
+
+    <div class="info-row">
+      <span class="k">MACD</span>
+      <span class="v">${last.macd?.toFixed(2) || "-"}</span>
+    </div>
+
+    <div class="info-row">
+      <span class="k">Bollinger %B</span>
+      <span class="v">${last.bbp ? (last.bbp * 100).toFixed(1) + "%" : "-"}</span>
+    </div>
+
+    <div class="info-row">
+      <span class="k">SMA 20</span>
+      <span class="v">$${last.sma20?.toFixed(2) || "-"}</span>
+    </div>
+
+    <div class="info-row">
+      <span class="k">EMA 12</span>
+      <span class="v">$${last.ema12?.toFixed(2) || "-"}</span>
+    </div>
+
+    <div class="info-row">
+      <span class="k">Avg Volume</span>
+      <span class="v">${fmtVol(last.avg_vol)}</span>
+    </div>
+  `;
+
+  document.getElementById("indPanel").style.display = "block";
+}
+
+
 
 
 document.getElementById("stockSelect").onchange = async function() {
@@ -396,6 +520,19 @@ document.getElementById("stockSelect").onchange = async function() {
   state = { stock:t, loaded:true, predicted:false, news:false, days:state.days };
 
   document.getElementById("chartLabel").textContent = t + " — Price Chart";
+
+
+  updateMetrics();
+  loadIndicators();
+  updateStockMeta(t);
+  updateIndicators();
+
+  document.getElementById("btnPred").disabled = false;
+  document.getElementById("btnNews").disabled = false;
+  document.getElementById("chartTabs").style.display = "flex";
+  document.getElementById("econRow").style.display = "grid";
+  document.getElementById("econSidebar").style.display = "block";
+
   drawChart("price");
 
   hideStatus();
