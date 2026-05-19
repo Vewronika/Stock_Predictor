@@ -1,0 +1,12 @@
+flask
+yfinance
+pandas
+numpy
+scikit-learn
+joblib
+vaderSentiment
+requests
+python-dotenv
+fredapi
+transformers
+torch

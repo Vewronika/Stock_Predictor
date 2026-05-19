@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Trend Predictor — AI Fundamentals</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: linear-gradient(160deg, #0a0f1e, #0f172a, #0c1222);
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 18px;
+    }
+
+    
+    .header {
+      max-width: 1340px; margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 40px; height: 40px; border-radius: 11px;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 15px; color: #fff;
+    }
+    .header h1 { font-size: 19px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-sub { font-size: 16px; color: #64748b; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .team-names { font-size: 11px; color: #64748b; }
+    .team-names span { color: #94a3b8; font-weight: 600; }
+    .tag {
+      display: inline-block; padding: 3px 10px; border-radius: 6px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .tag-green { background: #22c55e18; color: #22c55e; }
+    .tag-blue { background: #38bdf818; color: #38bdf8; }
+    .tag-red { background: #ef444418; color: #ef4444; }
+    .tag-yellow { background: #eab30818; color: #eab308; }
+    .tag-purple { background: #a78bfa18; color: #a78bfa; }
+
+
+    .layout {
+      max-width: 1340px; margin: 0 auto;
+      display: grid; grid-template-columns: 260px 1fr; gap: 16px;
+    }
+
+    .panel {
+      background: #111827; border: 1px solid #1e293b;
+      border-radius: 14px; padding: 16px;
+    }
+
+    .label {
+      font-size: 10px; color: #64748b; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;
+    }
+
+    
+    .sidebar { display: flex; flex-direction: column; gap: 12px; }
+
+    select {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid #1e293b; background: #0a0f1e;
+      color: #e2e8f0; font-size: 13px; font-family: inherit;
+      outline: none; cursor: pointer;
+    }
+    select option { background: #0a0f1e; }
+
+    .info-row {
+      display: flex; justify-content: space-between;
+      padding: 6px 0; font-size: 12px; border-bottom: 1px solid #1e293b;
+    }
+    .info-row:last-child { border: none; }
+    .info-row .k { color: #64748b; }
+    .info-row .v { color: #e2e8f0; font-weight: 600; }
+
+    .btn-group { display: flex; gap: 6px; margin-bottom: 10px; }
+    .btn-day {
+      flex: 1; padding: 7px; border-radius: 8px; text-align: center;
+      border: 1px solid #1e293b; background: #0a0f1e; color: #64748b;
+      font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .btn-day.active { border-color: #38bdf8; color: #38bdf8; background: #38bdf810; }
+    .btn-day:hover { border-color: #334155; }
+
+    .btn-model {
+      flex: 1; padding: 7px; border-radius: 8px; text-align: center;
+      border: 1px solid #1e293b; background: #0a0f1e; color: #64748b;
+      font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .btn-model.active { border-color: #a78bfa; color: #a78bfa; background: #a78bfa10; }
+    .btn-model:hover { border-color: #334155; }
+
+    .btn-primary {
+      width: 100%; padding: 11px 0; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      color: #fff; font-weight: 700; font-size: 13px;
+      cursor: pointer; font-family: inherit; transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { background: #1a2236; color: #475569; cursor: default; }
+
+    .btn-secondary {
+      width: 100%; padding: 11px 0; border-radius: 10px;
+      border: 1px solid #1e293b; background: #0a0f1e;
+      color: #e2e8f0; font-weight: 600; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-secondary:hover { border-color: #334155; }
+    .btn-secondary:disabled { color: #475569; cursor: default; }
+
+    
+    .main { display: flex; flex-direction: column; gap: 14px; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric .ml { font-size: 11px; color: #64748b; margin-bottom: 3px; }
+    .metric .mv { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .metric .mc { font-size: 12px; font-weight: 700; margin-top: 2px; }
+
+    .chart-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+    }
+    .chart-title { font-size: 15px; font-weight: 700; }
+    .chart-tabs { display: flex; gap: 4px; }
+    .chart-tab {
+      padding: 5px 12px; border-radius: 6px;
+      border: 1px solid #1e293b; background: transparent;
+      color: #64748b; font-size: 11px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .chart-tab.active { border-color: #38bdf8; background: #38bdf810; color: #38bdf8; }
+
+    .chart-box { position: relative; height: 300px; }
+    .placeholder {
+      height: 100%; display: flex; align-items: center; justify-content: center;
+      border: 2px dashed #1e293b; border-radius: 12px;
+      color: #475569; font-size: 13px; text-align: center; padding: 20px;
+    }
+
+    .pred-bar {
+      display: none; gap: 16px; padding: 12px 14px; margin-top: 12px;
+      background: #0a0f1e; border-radius: 10px; border: 1px solid #1e293b;
+    }
+    .pred-bar .col { flex: 1; }
+    .pred-bar .col .pl { font-size: 11px; color: #64748b; }
+    .pred-bar .col .pv { font-size: 20px; font-weight: 800; margin-top: 2px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .panel h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+
+    .news-item {
+      padding: 10px; border-radius: 10px;
+      background: #0a0f1e; border: 1px solid #1e293b; margin-bottom: 8px;
+    }
+    .news-item:last-child { margin-bottom: 0; }
+    .news-item .src { font-size: 10px; color: #64748b; }
+    .news-item .headline { font-size: 12px; color: #cbd5e1; margin: 4px 0 6px; line-height: 1.4; }
+    .sent-bar { height: 5px; background: #1e293b; border-radius: 3px; }
+    .sent-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+    .sent-val { font-size: 11px; font-weight: 700; text-align: right; margin-top: 2px; }
+
+    .sent-big { text-align: center; padding: 16px 0; }
+    .sent-big .sv { font-size: 36px; font-weight: 900; }
+
+    
+    .econ-card {
+      padding: 14px; text-align: center;
+    }
+    .econ-card .econ-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .econ-card .econ-value { font-size: 22px; font-weight: 800; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+    .econ-card .econ-desc { font-size: 11px; color: #64748b; }
+    .econ-card .econ-change { font-size: 11px; font-weight: 700; margin-top: 3px; }
+
+    .status-bar {
+      display: none; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 8px;
+      background: #1a2236; border: 1px solid #1e293b;
+      font-size: 12px; color: #94a3b8;
+    }
+    .status-bar.show { display: flex; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #38bdf8; animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .fade { animation: fadeIn 0.4s ease-out; }
+
+    @media (max-width: 960px) {
+      .layout, .grid-2, .grid-3, .metrics { grid-template-columns: 1fr; }
+      .footer-team { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">ST</div>
+    <div>
+      <h1>Stock Trend Predictor</h1>
+      <div class="header-sub">AI Fundamentals Project · Warsaw University of Technology</div>
+      <div style="margin-top:4px;font-size:18px;color:#94a3b8;font-weight:600;">Artem Poddierohin · Vladyslav Zelenkov · Veranika Karneichuk · Diego Ferrari</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-bar" id="statusBar"><div class="status-dot"></div><span id="statusText"></span></div>
+  </div>
+</div>
+
+
+<div class="layout">
+
+ 
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="label">Stock Selection</div>
+      <select id="stockSelect">
+        <option value="">Choose a stock…</option>
+        <optgroup label="Technology">
+          <option value="AAPL">AAPL — Apple Inc.</option>
+          <option value="MSFT">MSFT — Microsoft Corp.</option>
+          <option value="GOOGL">GOOGL — Alphabet Inc.</option>
+          <option value="META">META — Meta Platforms</option>
+          <option value="NVDA">NVDA — NVIDIA Corp.</option>
+          <option value="AMZN">AMZN — Amazon.com Inc.</option>
+          <option value="NFLX">NFLX — Netflix Inc.</option>
+          <option value="CRM">CRM — Salesforce Inc.</option>
+          <option value="ADBE">ADBE — Adobe Inc.</option>
+          <option value="INTC">INTC — Intel Corp.</option>
+          <option value="AMD">AMD — Adv. Micro Devices</option>
+          <option value="ORCL">ORCL — Oracle Corp.</option>
+          <option value="CSCO">CSCO — Cisco Systems</option>
+          <option value="IBM">IBM — IBM Corp.</option>
+          <option value="UBER">UBER — Uber Technologies</option>
+          <option value="SHOP">SHOP — Shopify Inc.</option>
+          <option value="PYPL">PYPL — PayPal Holdings</option>
+          <option value="SQ">SQ — Block Inc.</option>
+        </optgroup>
+        <optgroup label="Automotive">
+          <option value="TSLA">TSLA — Tesla Inc.</option>
+          <option value="F">F — Ford Motor Co.</option>
+          <option value="GM">GM — General Motors</option>
+          <option value="RIVN">RIVN — Rivian Automotive</option>
+        </optgroup>
+        <optgroup label="Finance">
+          <option value="JPM">JPM — JPMorgan Chase</option>
+          <option value="BAC">BAC — Bank of America</option>
+          <option value="GS">GS — Goldman Sachs</option>
+          <option value="MS">MS — Morgan Stanley</option>
+          <option value="V">V — Visa Inc.</option>
+          <option value="MA">MA — Mastercard Inc.</option>
+          <option value="BRK-B">BRK-B — Berkshire Hathaway</option>
+          <option value="C">C — Citigroup Inc.</option>
+          <option value="WFC">WFC — Wells Fargo</option>
+        </optgroup>
+        <optgroup label="Healthcare">
+          <option value="JNJ">JNJ — Johnson & Johnson</option>
+          <option value="UNH">UNH — UnitedHealth Group</option>
+          <option value="PFE">PFE — Pfizer Inc.</option>
+          <option value="ABBV">ABBV — AbbVie Inc.</option>
+          <option value="MRK">MRK — Merck & Co.</option>
+          <option value="LLY">LLY — Eli Lilly</option>
+        </optgroup>
+        <optgroup label="Energy">
+          <option value="XOM">XOM — Exxon Mobil</option>
+          <option value="CVX">CVX — Chevron Corp.</option>
+          <option value="COP">COP — ConocoPhillips</option>
+        </optgroup>
+        <optgroup label="Consumer">
+          <option value="WMT">WMT — Walmart Inc.</option>
+          <option value="COST">COST — Costco Wholesale</option>
+          <option value="HD">HD — Home Depot</option>
+          <option value="NKE">NKE — Nike Inc.</option>
+          <option value="SBUX">SBUX — Starbucks Corp.</option>
+          <option value="MCD">MCD — McDonald's Corp.</option>
+          <option value="KO">KO — Coca-Cola Co.</option>
+          <option value="PEP">PEP — PepsiCo Inc.</option>
+          <option value="PG">PG — Procter & Gamble</option>
+        </optgroup>
+        <optgroup label="Industrial & Aerospace">
+          <option value="BA">BA — Boeing Co.</option>
+          <option value="CAT">CAT — Caterpillar Inc.</option>
+          <option value="GE">GE — GE Aerospace</option>
+          <option value="LMT">LMT — Lockheed Martin</option>
+          <option value="UPS">UPS — United Parcel Service</option>
+        </optgroup>
+        <optgroup label="Telecom & Media">
+          <option value="DIS">DIS — Walt Disney Co.</option>
+          <option value="CMCSA">CMCSA — Comcast Corp.</option>
+          <option value="T">T — AT&T Inc.</option>
+          <option value="VZ">VZ — Verizon Communications</option>
+        </optgroup>
+      </select>
+      <div id="stockMeta" style="margin-top:10px;display:none;"></div>
+    </div>
+
+    <div class="panel">
+      <div class="label">Prediction Horizon</div>
+      <div class="btn-group">
+        <div class="btn-day" onclick="pickDay(1,this)">1D</div>
+        <div class="btn-day active" onclick="pickDay(3,this)">3D</div>
+        <div class="btn-day" onclick="pickDay(7,this)">7D</div>
+      </div>
+      <div class="label" style="margin-top:10px;">Algorithm</div>
+      <div class="btn-group">
+        <div class="btn-model active" onclick="pickModel('rf',this)">Random Forest</div>
+        <div class="btn-model" onclick="pickModel('gb',this)">Grad. Boost</div>
+      </div>
+      <button class="btn-primary" id="btnPred" disabled onclick="predict()">Run Prediction Model</button>
+      <button class="btn-secondary" id="btnRetrain" disabled onclick="retrain()" style="margin-top:8px;">↺ Re-train Models</button>
+    </div>
+
+    <div class="panel">
+      <div class="label">News Sentiment</div>
+      <button class="btn-secondary" id="btnNews" disabled onclick="loadNews()">Fetch News → VADER + FinBERT</button>
+      <button class="btn-secondary" id="btnSocial" disabled onclick="loadSocial()" style="margin-top:8px;">Fetch Social → Bluesky</button>
+    </div>
+
+    <div class="panel" id="indPanel" style="display:none;">
+      <div class="label">Technical Features</div>
+      <div id="indList"></div>
+    </div>
+
+    <div class="panel" id="econSidebar" style="display:none;">
+      <div class="label">Data Sources</div>
+      <div class="info-row"><span class="k">Prices</span><span class="v">yfinance</span></div>
+      <div class="info-row"><span class="k">News</span><span class="v">NewsAPI</span></div>
+      <div class="info-row"><span class="k">Sentiment</span><span class="v">VADER + FinBERT</span></div>
+      <div class="info-row"><span class="k">Economic</span><span class="v">FRED API</span></div>
+      <div class="info-row"><span class="k">VIX</span><span class="v">yfinance</span></div>
+      <div class="info-row"><span class="k">Social</span><span class="v">Bluesky</span></div>
+    </div>
+  </div>
+
+  
+  <div class="main">
+
+    
+    <div class="metrics" id="metricsRow" style="display:none;"></div>
+
+    
+    <div class="panel">
+      <div class="chart-header">
+        <div class="chart-title" id="chartLabel">Stock Price Chart</div>
+        <div class="chart-tabs" id="chartTabs" style="display:none;">
+          <button class="chart-tab active" onclick="switchTab('price',this)">Price</button>
+          <button class="chart-tab" onclick="switchTab('volume',this)">Volume</button>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="placeholder" id="chartMsg">Select a stock to load OHLCV data via <b>yfinance</b></div>
+        <canvas id="chart" style="display:none;"></canvas>
+      </div>
+      <div class="pred-bar" id="predBar"></div>
+    </div>
+
+    
+    <div class="grid-3" id="econRow" style="display:none;">
+      <div class="panel econ-card fade" id="econFed">
+        <div class="econ-label">Fed Funds Rate</div>
+        <div class="econ-value" style="color:#38bdf8;">—</div>
+        <div class="econ-desc">Federal Reserve</div>
+        <div class="econ-change" style="color:#64748b;">Source: FRED API</div>
+      </div>
+      <div class="panel econ-card fade" id="econCpi">
+        <div class="econ-label">CPI (Inflation)</div>
+        <div class="econ-value" style="color:#f59e0b;">—</div>
+        <div class="econ-desc">Consumer Price Index</div>
+        <div class="econ-change" style="color:#64748b;">Source: FRED API</div>
+      </div>
+      <div class="panel econ-card fade" id="econVix">
+        <div class="econ-label">VIX — Fear Index</div>
+        <div class="econ-value" style="color:#ef4444;">—</div>
+        <div class="econ-desc">Market Volatility</div>
+        <div class="econ-change" style="color:#64748b;">Source: yfinance ^VIX</div>
+      </div>
+    </div>
+
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Latest News</h3>
+        <div id="newsBox"><div class="placeholder" style="height:200px;">Fetch news to see headlines + VADER & FinBERT sentiment</div></div>
+      </div>
+      <div class="panel">
+        <h3>Sentiment Analysis</h3>
+        <div id="sentBox"><div class="placeholder" style="height:200px;">VADER + FinBERT comparison output</div></div>
+      </div>
+    </div>
+
+    <!-- Social Sentiment -->
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Social Media — Bluesky</h3>
+        <div id="socialBox"><div class="placeholder" style="height:200px;">Fetch social sentiment from Bluesky</div></div>
+      </div>
+      <div class="panel">
+        <h3>Social Sentiment</h3>
+        <div id="socialSentBox"><div class="placeholder" style="height:200px;">Bluesky → VADER + FinBERT output</div></div>
+      </div>
+    </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+
+const STOCKS = {
+  AAPL:  { name:"Apple Inc.",           ex:"NASDAQ", sector:"Technology" },
+  MSFT:  { name:"Microsoft Corp.",      ex:"NASDAQ", sector:"Technology" },
+  GOOGL: { name:"Alphabet Inc.",        ex:"NASDAQ", sector:"Technology" },
+  META:  { name:"Meta Platforms",       ex:"NASDAQ", sector:"Technology" },
+  NVDA:  { name:"NVIDIA Corp.",         ex:"NASDAQ", sector:"Technology" },
+  AMZN:  { name:"Amazon.com Inc.",      ex:"NASDAQ", sector:"E-Commerce" },
+  NFLX:  { name:"Netflix Inc.",         ex:"NASDAQ", sector:"Technology" },
+  CRM:   { name:"Salesforce Inc.",      ex:"NYSE",   sector:"Technology" },
+  ADBE:  { name:"Adobe Inc.",           ex:"NASDAQ", sector:"Technology" },
+  INTC:  { name:"Intel Corp.",          ex:"NASDAQ", sector:"Technology" },
+  AMD:   { name:"Adv. Micro Devices",   ex:"NASDAQ", sector:"Technology" },
+  ORCL:  { name:"Oracle Corp.",         ex:"NYSE",   sector:"Technology" },
+  CSCO:  { name:"Cisco Systems",        ex:"NASDAQ", sector:"Technology" },
+  IBM:   { name:"IBM Corp.",            ex:"NYSE",   sector:"Technology" },
+  UBER:  { name:"Uber Technologies",    ex:"NYSE",   sector:"Technology" },
+  SHOP:  { name:"Shopify Inc.",         ex:"NYSE",   sector:"Technology" },
+  PYPL:  { name:"PayPal Holdings",      ex:"NASDAQ", sector:"Technology" },
+  SQ:    { name:"Block Inc.",           ex:"NYSE",   sector:"Technology" },
+  TSLA:  { name:"Tesla Inc.",           ex:"NASDAQ", sector:"Automotive" },
+  F:     { name:"Ford Motor Co.",       ex:"NYSE",   sector:"Automotive" },
+  GM:    { name:"General Motors",       ex:"NYSE",   sector:"Automotive" },
+  RIVN:  { name:"Rivian Automotive",    ex:"NASDAQ", sector:"Automotive" },
+  JPM:   { name:"JPMorgan Chase",       ex:"NYSE",   sector:"Finance" },
+  BAC:   { name:"Bank of America",      ex:"NYSE",   sector:"Finance" },
+  GS:    { name:"Goldman Sachs",        ex:"NYSE",   sector:"Finance" },
+  MS:    { name:"Morgan Stanley",       ex:"NYSE",   sector:"Finance" },
+  V:     { name:"Visa Inc.",            ex:"NYSE",   sector:"Finance" },
+  MA:    { name:"Mastercard Inc.",       ex:"NYSE",   sector:"Finance" },
+  "BRK-B":{ name:"Berkshire Hathaway",  ex:"NYSE",   sector:"Finance" },
+  C:     { name:"Citigroup Inc.",       ex:"NYSE",   sector:"Finance" },
+  WFC:   { name:"Wells Fargo",          ex:"NYSE",   sector:"Finance" },
+  JNJ:   { name:"Johnson & Johnson",    ex:"NYSE",   sector:"Healthcare" },
+  UNH:   { name:"UnitedHealth Group",   ex:"NYSE",   sector:"Healthcare" },
+  PFE:   { name:"Pfizer Inc.",          ex:"NYSE",   sector:"Healthcare" },
+  ABBV:  { name:"AbbVie Inc.",          ex:"NYSE",   sector:"Healthcare" },
+  MRK:   { name:"Merck & Co.",          ex:"NYSE",   sector:"Healthcare" },
+  LLY:   { name:"Eli Lilly",            ex:"NYSE",   sector:"Healthcare" },
+  XOM:   { name:"Exxon Mobil",          ex:"NYSE",   sector:"Energy" },
+  CVX:   { name:"Chevron Corp.",        ex:"NYSE",   sector:"Energy" },
+  COP:   { name:"ConocoPhillips",       ex:"NYSE",   sector:"Energy" },
+  WMT:   { name:"Walmart Inc.",         ex:"NYSE",   sector:"Consumer" },
+  COST:  { name:"Costco Wholesale",     ex:"NASDAQ", sector:"Consumer" },
+  HD:    { name:"Home Depot",           ex:"NYSE",   sector:"Consumer" },
+  NKE:   { name:"Nike Inc.",            ex:"NYSE",   sector:"Consumer" },
+  SBUX:  { name:"Starbucks Corp.",      ex:"NASDAQ", sector:"Consumer" },
+  MCD:   { name:"McDonald's Corp.",     ex:"NYSE",   sector:"Consumer" },
+  KO:    { name:"Coca-Cola Co.",        ex:"NYSE",   sector:"Consumer" },
+  PEP:   { name:"PepsiCo Inc.",         ex:"NASDAQ", sector:"Consumer" },
+  PG:    { name:"Procter & Gamble",     ex:"NYSE",   sector:"Consumer" },
+  BA:    { name:"Boeing Co.",           ex:"NYSE",   sector:"Aerospace" },
+  CAT:   { name:"Caterpillar Inc.",     ex:"NYSE",   sector:"Industrial" },
+  GE:    { name:"GE Aerospace",         ex:"NYSE",   sector:"Industrial" },
+  LMT:   { name:"Lockheed Martin",      ex:"NYSE",   sector:"Aerospace" },
+  UPS:   { name:"United Parcel Service", ex:"NYSE",   sector:"Industrial" },
+  DIS:   { name:"Walt Disney Co.",      ex:"NYSE",   sector:"Media" },
+  CMCSA: { name:"Comcast Corp.",        ex:"NASDAQ", sector:"Telecom" },
+  T:     { name:"AT&T Inc.",            ex:"NYSE",   sector:"Telecom" },
+  VZ:    { name:"Verizon Communications",ex:"NYSE",  sector:"Telecom" },
+};
+
+function getStockLabel(t) {
+  return STOCKS[t] ? `${t} — ${STOCKS[t].name}` : t;
+}
+
+document.getElementById("stockSelect").onchange = function() {
+  const t = this.value;
+  if (!t) return;
+  loadStock(t);
+};
+
+let state = { stock:null, loaded:false, predicted:false, news:false, days:3, model:"rf" };
+let chart = null;
+let priceData = [];
+
+
+function showStatus(msg) {
+  document.getElementById("statusBar").classList.add("show");
+  document.getElementById("statusText").textContent = msg;
+}
+function hideStatus() { document.getElementById("statusBar").classList.remove("show"); }
+
+function sentColor(v) { return v > 0.05 ? "#22c55e" : v < -0.05 ? "#ef4444" : "#eab308"; }
+function sentLabel(v) { return v > 0.05 ? "Bullish" : v < -0.05 ? "Bearish" : "Neutral"; }
+
+function trendLabel(changePct) {
+  if (changePct >=  2.0) return { col: "#22c55e", arrow: "↑",  trendName: "Bullish"          };
+  if (changePct >=  0.5) return { col: "#86efac", arrow: "↗",  trendName: "Slightly Bullish"  };
+  if (changePct >= -0.5) return { col: "#eab308", arrow: "→",  trendName: "Neutral"           };
+  if (changePct >= -2.0) return { col: "#fb923c", arrow: "↘",  trendName: "Slightly Bearish"  };
+                         return { col: "#ef4444", arrow: "↓",  trendName: "Bearish"           };
+}
+function sentBadge(v) {
+  const c = sentColor(v), l = sentLabel(v);
+  return `<span class="tag" style="background:${c}18;color:${c};">${l}</span>`;
+}
+
+function rsiColor(v) {
+  if (v === null || v === undefined) return "#64748b";
+  return v < 30 ? "#22c55e" : v > 70 ? "#ef4444" : "#e2e8f0";
+}
+
+function updateNewsBtnLabel() {
+  const btn = document.getElementById("btnNews");
+  btn.textContent = "Fetch News → VADER + FinBERT";
+  btn.disabled = !state.loaded;
+}
+
+async function loadStock(t) {
+  if (!t) return;
+
+  document.getElementById("btnPred").disabled = true;
+  document.getElementById("btnNews").disabled = true;
+  document.getElementById("btnSocial").disabled = true;
+  showStatus(`Loading ${t} data…`);
+
+  try {
+    const [dataRes, econRes] = await Promise.all([
+      fetch(`/data?stock=${t}`),
+      fetch("/econ"),
+    ]);
+    priceData = await dataRes.json();
+
+    if (priceData.error) throw new Error(priceData.error);
+    if (!priceData.length) throw new Error(`No data found for ${t}. Check if the ticker is valid.`);
+
+    const econ = await econRes.json();
+
+    state = { stock:t, loaded:true, predicted:false, news:false, days:state.days, model:state.model||"rf" };
+
+    const last = priceData[priceData.length - 1];
+    const prev = priceData.length > 1 ? priceData[priceData.length - 2] : last;
+    const change = last.close - prev.close;
+    const changePct = (change / prev.close * 100).toFixed(2);
+    const chgCol = change >= 0 ? "#22c55e" : "#ef4444";
+    const sign = change >= 0 ? "+" : "";
+
+    document.getElementById("metricsRow").style.display = "grid";
+    document.getElementById("metricsRow").innerHTML = `
+      <div class="panel metric">
+        <div class="ml">Current Price</div>
+        <div class="mv">$${last.close.toFixed(2)}</div>
+        <div class="mc" style="color:${chgCol}">${sign}${change.toFixed(2)} (${sign}${changePct}%)</div>
+      </div>
+      <div class="panel metric">
+        <div class="ml">Volume</div>
+        <div class="mv">${(last.volume / 1e6).toFixed(2)}M</div>
+        <div class="mc" style="color:#64748b">shares traded</div>
+      </div>
+      <div class="panel metric">
+        <div class="ml">RSI 14</div>
+        <div class="mv" style="color:${rsiColor(last.rsi14)}">${last.rsi14 !== null ? last.rsi14.toFixed(1) : "—"}</div>
+        <div class="mc" style="color:#64748b">${last.rsi14 < 30 ? "Oversold" : last.rsi14 > 70 ? "Overbought" : "Neutral"}</div>
+      </div>
+      <div class="panel metric">
+        <div class="ml">SMA 20</div>
+        <div class="mv">${last.sma20 !== null ? "$" + last.sma20.toFixed(2) : "—"}</div>
+        <div class="mc" style="color:#f97316">20-day average</div>
+      </div>
+    `;
+
+    document.getElementById("indPanel").style.display = "block";
+    document.getElementById("indList").innerHTML = `
+      <div class="info-row"><span class="k">SMA 20</span><span class="v">${last.sma20 !== null ? "$" + last.sma20.toFixed(2) : "—"}</span></div>
+      <div class="info-row"><span class="k">EMA 12</span><span class="v">${last.ema12 !== null ? "$" + last.ema12.toFixed(2) : "—"}</span></div>
+      <div class="info-row"><span class="k">RSI 14</span><span class="v" style="color:${rsiColor(last.rsi14)}">${last.rsi14 !== null ? last.rsi14.toFixed(1) : "—"}</span></div>
+      <div class="info-row"><span class="k">MACD</span><span class="v" style="color:${last.macd !== null && last.macd >= 0 ? "#22c55e" : "#ef4444"}">${last.macd !== null ? last.macd.toFixed(3) : "—"}</span></div>
+    `;
+
+    document.getElementById("econSidebar").style.display = "block";
+    document.getElementById("econRow").style.display = "grid";
+    document.getElementById("econFed").querySelector(".econ-value").textContent = econ.fed_rate ? econ.fed_rate.toFixed(2) + "%" : "—";
+    document.getElementById("econCpi").querySelector(".econ-value").textContent = econ.cpi ? econ.cpi.toFixed(1) + "%" : "—";
+    document.getElementById("econVix").querySelector(".econ-value").textContent = econ.vix ? econ.vix.toFixed(2) : "—";
+
+    document.getElementById("chartLabel").textContent = `${t} — ${getStockLabel(t).replace(t + " — ", "")}`;
+    document.getElementById("chartTabs").style.display = "flex";
+    window.predData = null;
+    drawChart("price");
+
+    // Reset prediction bar
+    document.getElementById("predBar").style.display = "none";
+    document.getElementById("predBar").innerHTML = "";
+
+    // Reset news section
+    document.getElementById("newsBox").innerHTML = '<div class="placeholder" style="height:200px;"><div style="display:flex;align-items:center;gap:8px;"><div class="status-dot" style="width:8px;height:8px;border-radius:50%;background:#38bdf8;animation:pulse 1.2s infinite;"></div> Loading news in background…</div></div>';
+    document.getElementById("sentBox").innerHTML = '<div class="placeholder" style="height:200px;">Waiting for news…</div>';
+
+    // Reset social section
+    document.getElementById("socialBox").innerHTML = '<div class="placeholder" style="height:200px;">Click <b>Fetch Social</b> to load Bluesky posts</div>';
+    document.getElementById("socialSentBox").innerHTML = '<div class="placeholder" style="height:200px;">Bluesky → VADER + FinBERT output</div>';
+
+    // Pre-fetch news in background (triggers FinBERT loading)
+    window.prefetchedNews = null;
+    fetch(`/news?stock=${t}`).then(r => r.json()).then(data => {
+      if (data.error) return;
+      if (state.stock === t) {
+        window.prefetchedNews = data;
+        document.getElementById("newsBox").innerHTML = '<div class="placeholder" style="height:200px;">News ready — click <b>Fetch News</b> to display</div>';
+        document.getElementById("sentBox").innerHTML = '<div class="placeholder" style="height:200px;">News ready — click <b>Fetch News</b> to display</div>';
+      }
+    }).catch(() => {});
+
+    document.getElementById("btnPred").disabled = false;
+    document.getElementById("btnRetrain").disabled = false;
+    document.getElementById("btnSocial").disabled = false;
+    updateNewsBtnLabel();
+
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    hideStatus();
+  }
+}
+
+
+
+
+
+let currentTab = "price";
+
+function drawChart(tab) {
+  document.getElementById("chartMsg").style.display = "none";
+  const canvas = document.getElementById("chart");
+  canvas.style.display = "block";
+  if (chart) chart.destroy();
+
+  if (tab === "price") {
+    const datasets = [
+      { label:"Close", data:priceData.map(d=>d.close), borderColor:"#38bdf8", backgroundColor:"rgba(56,189,248,0.07)", borderWidth:2, pointRadius:0, tension:0.3, fill:true },
+      { label:"SMA 20", data:priceData.map(d=>d.sma20), borderColor:"#f97316", borderWidth:1.5, borderDash:[5,3], pointRadius:0, tension:0.3, fill:false },
+      { label:"EMA 12", data:priceData.map(d=>d.ema12), borderColor:"#a78bfa", borderWidth:1, borderDash:[3,3], pointRadius:0, tension:0.3, fill:false },
+    ];
+
+    if (state.predicted && window.predData) {
+      const pad = new Array(priceData.length-1).fill(null);
+      const lastC = priceData[priceData.length-1].close;
+      datasets.push({
+        label:"Predicted", data:[...pad, lastC, ...predData.preds.map(p=>p.predicted)],
+        borderColor:"#22c55e", borderWidth:2.5, borderDash:[6,3], pointRadius:0, tension:0.3, fill:false,
+      });
+    }
+
+    chart = new Chart(canvas, {
+      type:"line",
+      data:{ labels:[...priceData.map(d=>d.date), ...(window.predData?predData.preds.map(p=>p.date):[])], datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ labels:{ color:"#94a3b8", font:{size:11}, boxWidth:14, padding:12 } },
+          tooltip:{ backgroundColor:"#1e293b", titleColor:"#e2e8f0", bodyColor:"#cbd5e1", borderColor:"#334155", borderWidth:1 }
+        },
+        scales:{
+          x:{ ticks:{ color:"#64748b", font:{size:9}, maxTicksLimit:8 }, grid:{ color:"#1e293b" } },
+          y:{ ticks:{ color:"#64748b", font:{size:9} }, grid:{ color:"#1e293b" } }
+        }
+      }
+    });
+  } else {
+    const last30 = priceData.slice(-30);
+    chart = new Chart(canvas, {
+      type:"bar",
+      data:{
+        labels:last30.map(d=>d.date),
+        datasets:[{
+          label:"Volume", data:last30.map(d=>d.volume),
+          backgroundColor:last30.map(d=>d.close>=d.open?"rgba(34,197,94,0.35)":"rgba(239,68,68,0.35)"),
+          borderColor:last30.map(d=>d.close>=d.open?"#22c55e":"#ef4444"),
+          borderWidth:1, borderRadius:4
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{ backgroundColor:"#1e293b", titleColor:"#e2e8f0", bodyColor:"#cbd5e1", borderColor:"#334155", borderWidth:1 } },
+        scales:{
+          x:{ ticks:{ color:"#64748b", font:{size:9} }, grid:{ color:"#1e293b" } },
+          y:{ ticks:{ color:"#64748b", font:{size:9}, callback:v=>(v/1e6).toFixed(0)+"M" }, grid:{ color:"#1e293b" } }
+        }
+      }
+    });
+  }
+}
+
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll(".chart-tab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  drawChart(tab);
+}
+
+
+function pickDay(d, el) {
+  state.days = d;
+  el.closest(".btn-group").querySelectorAll(".btn-day").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+function pickModel(m, el) {
+  state.model = m;
+  el.closest(".btn-group").querySelectorAll(".btn-model").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+async function predict() {
+  if (!state.loaded) return;
+  showStatus(`Training Random Forest · predicting ${state.days}-day horizon…`);
+  document.getElementById("btnPred").disabled = true;
+
+  let success = false;
+  try {
+    const res = await fetch(`/predict?stock=${state.stock}&days=${state.days}&model=${state.model}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    state.predicted = true;
+    window.predData = {
+      preds: data.predictions.map(p => ({ date: p.date, predicted: p.price })),
+      trend: data.trend === "up",
+    };
+
+    const changePct = (data.target_price - data.current_price) / data.current_price * 100;
+    const { col, arrow, trendName } = trendLabel(changePct);
+    const confPct   = (data.accuracy * 100).toFixed(1);
+
+    let sentHtml = "";
+    if (data.sentiment_score !== null) {
+      const diff = data.target_price - data.raw_price;
+      const sentCol = diff >= 0 ? "#22c55e" : "#ef4444";
+      const sentSign = diff >= 0 ? "+" : "";
+      sentHtml = `<div style="font-size:11px;color:${sentCol};margin-top:4px;">` +
+        `${sentSign}$${Math.abs(diff).toFixed(2)} sentiment ` +
+        `(sentiment ${data.sentiment_score >= 0 ? "+" : ""}${data.sentiment_score.toFixed(2)})</div>`;
+    }
+
+    const bar = document.getElementById("predBar");
+    bar.style.display = "flex";
+    bar.classList.add("fade");
+    bar.innerHTML = `
+      <div class="col"><div class="pl">Predicted Trend</div><div class="pv" style="color:${col}">${arrow} ${trendName}</div></div>
+      <div class="col"><div class="pl">Target Price (${state.days}D)</div><div class="pv">$${data.target_price.toFixed(2)}</div>${sentHtml}</div>
+      <div class="col"><div class="pl">Directional Accuracy</div><div class="pv" style="color:#38bdf8">${confPct}%</div></div>
+      <div class="col"><div class="pl">Model</div><div class="pv" style="font-size:14px;color:#a78bfa;">${data.model}</div></div>
+    `;
+
+    drawChart("price");
+    success = true;
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Prediction failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    if (success) hideStatus();
+    document.getElementById("btnPred").disabled = false;
+  }
+}
+
+
+async function loadNews() {
+  if (!state.loaded) return;
+  document.getElementById("btnNews").disabled = true;
+
+  let success = false;
+  let data = null;
+
+  try {
+    // Use prefetched data if available (already loaded in background)
+    if (window.prefetchedNews && !state.news) {
+      data = window.prefetchedNews;
+      window.prefetchedNews = null;
+      showStatus("Displaying pre-loaded news…");
+    } else {
+      showStatus("Fetching news → running VADER + FinBERT sentiment…");
+      const res = await fetch(`/news?stock=${state.stock}`);
+      data = await res.json();
+    }
+
+    if (data.error) throw new Error(data.error);
+
+    state.news = true;
+    updateNewsBtnLabel();
+
+    document.getElementById("newsBox").innerHTML = data.articles.map(n => {
+      const col = sentColor(n.sentiment);
+      const pct = ((n.sentiment + 1) / 2) * 100;
+      const href = n.url ? `href="${n.url}" target="_blank" rel="noopener"` : "";
+      const vCol = sentColor(n.sentiment_vader);
+      const fScore = n.sentiment_finbert !== null && n.sentiment_finbert !== undefined;
+      const fCol = fScore ? sentColor(n.sentiment_finbert) : "#475569";
+      return `<div class="news-item fade">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="src">${n.source} · ${n.published_at.slice(0,10)}</span>${sentBadge(n.sentiment)}
+        </div>
+        <div class="headline"><a ${href} style="color:inherit;text-decoration:none;">${n.title}</a></div>
+        <div style="display:flex;gap:12px;margin-top:4px;">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+              <span style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">VADER</span>
+              <span style="font-size:11px;font-weight:700;color:${vCol};">${n.sentiment_vader > 0 ? "+" : ""}${n.sentiment_vader.toFixed(3)}</span>
+            </div>
+            <div class="sent-bar"><div class="sent-fill" style="width:${((n.sentiment_vader+1)/2)*100}%;background:${vCol};"></div></div>
+          </div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+              <span style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">FinBERT</span>
+              <span style="font-size:11px;font-weight:700;color:${fCol};">${fScore ? (n.sentiment_finbert > 0 ? "+" : "") + n.sentiment_finbert.toFixed(3) : "N/A"}</span>
+            </div>
+            <div class="sent-bar"><div class="sent-fill" style="width:${fScore ? ((n.sentiment_finbert+1)/2)*100 : 50}%;background:${fCol};"></div></div>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    const avg     = data.avg_sentiment;
+    const avgV    = data.avg_vader;
+    const avgF    = data.avg_finbert;
+    const hasFB   = avgF !== null && avgF !== undefined;
+    const col     = sentColor(avg);
+    const colV    = sentColor(avgV);
+    const colF    = hasFB ? sentColor(avgF) : "#475569";
+    const mood    = avg > 0.05 ? "Market Bullish" : avg < -0.05 ? "Market Bearish" : "Market Neutral";
+    const badgeCls= avg > 0.05 ? "tag-green" : avg < -0.05 ? "tag-red" : "tag-yellow";
+    const demoNote= data.demo_mode
+      ? `<div style="margin-top:6px;font-size:10px;color:#475569;">Demo mode — set FINNHUB_KEY or NEWSAPI_KEY for live news</div>`
+      : "";
+
+    document.getElementById("sentBox").innerHTML = `
+      <div class="sent-big fade">
+        <div style="margin-top:8px;"><span class="tag ${badgeCls}">${mood}</span></div>
+        <div style="display:flex;gap:20px;justify-content:center;margin-top:14px;">
+          <div style="text-align:center;">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">VADER</div>
+            <div style="font-size:28px;font-weight:900;color:${colV};">${avgV >= 0 ? "+" : ""}${avgV.toFixed(3)}</div>
+          </div>
+          <div style="width:1px;background:#1e293b;"></div>
+          <div style="text-align:center;">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">FinBERT</div>
+            <div style="font-size:28px;font-weight:900;color:${colF};">${hasFB ? (avgF >= 0 ? "+" : "") + avgF.toFixed(3) : "N/A"}</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#475569;">
+          ${data.articles.length} articles ·
+          <span style="color:#94a3b8;font-weight:600;">${data.source}</span>
+        </div>
+        ${demoNote}
+      </div>
+      <div style="height:130px;position:relative;"><canvas id="sentChart"></canvas></div>
+    `;
+
+    const chartLabels = data.articles.map((_, i) => "Art." + (i + 1));
+    const chartDatasets = [
+      {
+        label: "VADER",
+        data: data.articles.map(n => n.sentiment_vader),
+        backgroundColor: data.articles.map(n => sentColor(n.sentiment_vader) + "50"),
+        borderColor: data.articles.map(n => sentColor(n.sentiment_vader)),
+        borderWidth: 1, borderRadius: 4,
+      }
+    ];
+    if (hasFB) {
+      chartDatasets.push({
+        label: "FinBERT",
+        data: data.articles.map(n => n.sentiment_finbert),
+        backgroundColor: data.articles.map(n => {
+          const s = n.sentiment_finbert;
+          return s !== null ? sentColor(s) + "90" : "#47556940";
+        }),
+        borderColor: data.articles.map(n => {
+          const s = n.sentiment_finbert;
+          return s !== null ? sentColor(s) : "#475569";
+        }),
+        borderWidth: 2, borderRadius: 4,
+      });
+    }
+
+    new Chart(document.getElementById("sentChart"), {
+      type:"bar",
+      data:{ labels: chartLabels, datasets: chartDatasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display: hasFB, labels:{ color:"#94a3b8", font:{size:10}, boxWidth:12 } } },
+        scales:{
+          x:{ ticks:{color:"#64748b",font:{size:10}}, grid:{display:false} },
+          y:{ min:-1, max:1, ticks:{color:"#64748b",font:{size:10}}, grid:{color:"#1e293b"} }
+        }
+      }
+    });
+
+    success = true;
+  } catch (err) {
+    document.getElementById("statusText").textContent = "News fetch failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    if (success) hideStatus();
+    document.getElementById("btnNews").disabled = false;
+  }
+}
+
+
+
+async function loadSocial() {
+  if (!state.loaded) return;
+  document.getElementById("btnSocial").disabled = true;
+  let success = false;
+  let data = null;
+  try {
+    showStatus("Fetching Bluesky → running VADER + FinBERT…");
+    const res = await fetch(`/social?stock=${state.stock}`);
+    data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById("socialBox").innerHTML = data.messages.length === 0
+      ? '<div class="placeholder" style="height:200px;">No Bluesky messages found</div>'
+      : data.messages.map(m => {
+        const vCol = sentColor(m.sentiment_vader);
+        const fScore = m.sentiment_finbert !== null && m.sentiment_finbert !== undefined;
+        const fCol = fScore ? sentColor(m.sentiment_finbert) : "#475569";
+        return `<div class="news-item fade">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="src">${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="color:#64748b;text-decoration:none;">${m.handle}</a>` : m.handle} · ${m.created_at.slice(0,10)}</span>${sentBadge(m.sentiment)}
+          </div>
+          <div class="headline">${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">${m.body}</a>` : m.body}</div>
+          <div style="display:flex;gap:12px;margin-top:4px;">
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">VADER</span>
+                <span style="font-size:11px;font-weight:700;color:${vCol};">${m.sentiment_vader > 0 ? "+" : ""}${m.sentiment_vader.toFixed(3)}</span>
+              </div>
+              <div class="sent-bar"><div class="sent-fill" style="width:${((m.sentiment_vader+1)/2)*100}%;background:${vCol};"></div></div>
+            </div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;">FinBERT</span>
+                <span style="font-size:11px;font-weight:700;color:${fCol};">${fScore ? (m.sentiment_finbert > 0 ? "+" : "") + m.sentiment_finbert.toFixed(3) : "N/A"}</span>
+              </div>
+              <div class="sent-bar"><div class="sent-fill" style="width:${fScore ? ((m.sentiment_finbert+1)/2)*100 : 50}%;background:${fCol};"></div></div>
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+
+    if (data.messages.length > 0) {
+      const avgV = data.avg_vader, avgF = data.avg_finbert;
+      const hasFB = avgF !== null && avgF !== undefined;
+      const colV = sentColor(avgV), colF = hasFB ? sentColor(avgF) : "#475569";
+      const badgeCls = data.avg_sentiment > 0.05 ? "tag-green" : data.avg_sentiment < -0.05 ? "tag-red" : "tag-yellow";
+      document.getElementById("socialSentBox").innerHTML = `
+        <div class="sent-big fade">
+          <div style="margin-top:8px;"><span class="tag ${badgeCls}">${data.mood}</span></div>
+          <div style="display:flex;gap:20px;justify-content:center;margin-top:14px;">
+            <div style="text-align:center;">
+              <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">VADER</div>
+              <div style="font-size:28px;font-weight:900;color:${colV};">${avgV >= 0 ? "+" : ""}${avgV.toFixed(3)}</div>
+            </div>
+            <div style="width:1px;background:#1e293b;"></div>
+            <div style="text-align:center;">
+              <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">FinBERT</div>
+              <div style="font-size:28px;font-weight:900;color:${colF};">${hasFB ? (avgF >= 0 ? "+" : "") + avgF.toFixed(3) : "N/A"}</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:#475569;">
+            ${data.message_count} messages <span style="color:#a78bfa;font-weight:600;">Bluesky</span>
+          </div>
+        </div>
+        <div style="height:130px;position:relative;"><canvas id="socialChart"></canvas></div>
+      `;
+      const chartDs = [{label:"VADER",data:data.messages.map(m=>m.sentiment_vader),backgroundColor:data.messages.map(m=>sentColor(m.sentiment_vader)+"50"),borderColor:data.messages.map(m=>sentColor(m.sentiment_vader)),borderWidth:1,borderRadius:4}];
+      if(hasFB) chartDs.push({label:"FinBERT",data:data.messages.map(m=>m.sentiment_finbert),backgroundColor:data.messages.map(m=>sentColor(m.sentiment_finbert)+"90"),borderColor:data.messages.map(m=>sentColor(m.sentiment_finbert)),borderWidth:2,borderRadius:4});
+      new Chart(document.getElementById("socialChart"),{type:"bar",data:{labels:data.messages.map((_,i)=>"Msg."+(i+1)),datasets:chartDs},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:hasFB,labels:{color:"#94a3b8",font:{size:10},boxWidth:12}}},scales:{x:{ticks:{color:"#64748b",font:{size:10}},grid:{display:false}},y:{min:-1,max:1,ticks:{color:"#64748b",font:{size:10}},grid:{color:"#1e293b"}}}}});
+    } else {
+      document.getElementById("socialSentBox").innerHTML = '<div class="placeholder" style="height:200px;">No social data</div>';
+    }
+    success = true;
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Social fetch failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    if (success) hideStatus();
+    document.getElementById("btnSocial").disabled = false;
+  }
+}
+
+// Re-train models for selected stock
+async function retrain() {
+  if (!state.loaded) return;
+  const mk = state.model || "rf";
+  showStatus(`Re-training ${state.stock} — all horizons…`);
+  document.getElementById("btnRetrain").disabled = true;
+  document.getElementById("btnPred").disabled = true;
+
+  try {
+    const res = await fetch(`/retrain?stock=${state.stock}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const r = data.results;
+    document.getElementById("statusText").textContent =
+      `${state.stock} retrained — ${mk.toUpperCase()}  ` +
+      `1D: ${(r[`${mk}_1d`].accuracy * 100).toFixed(1)}%  ` +
+      `3D: ${(r[`${mk}_3d`].accuracy * 100).toFixed(1)}%  ` +
+      `7D: ${(r[`${mk}_7d`].accuracy * 100).toFixed(1)}%`;
+    setTimeout(hideStatus, 5000);
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Retraining failed: " + err.message;
+    setTimeout(hideStatus, 4000);
+  } finally {
+    document.getElementById("btnRetrain").disabled = false;
+    document.getElementById("btnPred").disabled = false;
+  }
+}
+
+</script>
+</body>
+</html>
