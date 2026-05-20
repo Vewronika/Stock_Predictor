@@ -727,7 +727,8 @@ function pickModel(m, el) {
 
 async function predict() {
   if (!state.loaded) return;
-  showStatus(`Training Random Forest · predicting ${state.days}-day horizon…`);
+  const modelName = state.model === "gb" ? "Gradient Boosting" : "Random Forest";
+  showStatus(`Training ${modelName} · predicting ${state.days}-day horizon…`);
   document.getElementById("btnPred").disabled = true;
 
   let success = false;

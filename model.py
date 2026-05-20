@@ -212,7 +212,7 @@ def predict(ticker, horizon=1, algo="rf"):
         "current_price": round(current_price, 2),
         "target_price": round(target_price, 2),
         "raw_price": round(raw_price, 2),
-        "sentiment_score": round(sentiment, 3) if sentiment else None,
+        "sentiment_score": round(sentiment, 3) if sentiment is not None else None,
         "trend": "up" if direction == 1 else "down",
         "accuracy": round(meta["accuracy"], 2),
         "mae": meta.get("mae"), "rmse": meta.get("rmse"),
